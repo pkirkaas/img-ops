@@ -19,5 +19,6 @@ cache/
 __pypackages__/
 __pycache__/
 .pdm-python
+/dist/
 
 
