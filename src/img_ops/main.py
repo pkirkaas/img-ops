@@ -1,4 +1,4 @@
-"""Main entry point for the img-ops package."""
+"""Main entry point for the img_ops package."""
 
 import sys
 from typing import List, Optional
@@ -17,7 +17,7 @@ def start(args: Optional[List[str]] = None) -> int:
     """
     try:
         # Print the main message
-        print("In img-ops.main:start with Python & Poetry")
+        print("In img_ops.main:start with Python & Poetry")
         return 0
     except Exception as e:
         # Simple error handling

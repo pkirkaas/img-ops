@@ -17,7 +17,7 @@ def test_start_function(monkeypatch):
     
     # Check the result
     assert result == 0
-    assert captured_output.getvalue().strip() == "In img-ops.main:start with Python & Poetry"
+    assert captured_output.getvalue().strip() == "In img_ops.main:start with Python & Poetry"
 
 
 def test_start_function_error_handling(monkeypatch):
