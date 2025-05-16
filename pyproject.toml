@@ -1,0 +1,15 @@
+[project]
+name = "img-ops"
+version = "0.1.0"
+description = ""
+authors = [{ name = "Paul Kirkaas", email = "pkirkaas@gmail.com" }]
+readme = "README.md"
+requires-python = ">=3.13"
+dependencies = ["opencv-contrib-python (>=4.11.0.86,<5.0.0.0)"]
+[tool.poetry.scripts]
+start = "img-ops.main:start"
+[tool.poetry]
+packages = [{ include = "img_ops", from = "src" }]
+[build-system]
+requires = ["poetry-core>=2.0.0,<3.0.0"]
+build-backend = "poetry.core.masonry.api"
