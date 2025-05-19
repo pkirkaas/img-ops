@@ -1,0 +1,4 @@
+- This is a Python3 project
+- It uses the latest Python3 (v >= python 3.12)
+- It uses the latest version of all python packages/libraries
+- It uses Poetry to maintain project specific dependencies & virtual environment

@@ -1,0 +1,4 @@
+- This is a standalone Python desktop application, not web based
+- This application will be used to compare, analyze, sort, and move images from the local file system
+- This application will provide all functionality both through a command line/terminal interface, as well as a windowed GUI.
+- All the functionality will be provided in a common src/lib folder, which exports the functionality for use in the CLI & GUI interfaces
