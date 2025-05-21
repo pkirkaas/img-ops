@@ -1,0 +1,4 @@
+# aider conf for img-ops
+read:
+  - README.md
+  - .roo/rules

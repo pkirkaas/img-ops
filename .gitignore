@@ -18,6 +18,7 @@ cache/
 .pdm.toml
 __pypackages__/
 __pycache__/
+.cache/
 .pdm-python
 /dist/
 
