@@ -2,8 +2,9 @@
 Defines the MainWindow class for the img-ops application.
 """
 from PySide6.QtWidgets import QMainWindow, QLabel, QVBoxLayout, QWidget
-from PySide6.QtCore import Qt # Added for Qt.Orientation
+from PySide6.QtCore import Qt, QDir # Added for Qt.Orientation and QDir
 from ..widgets.resize_container import ResizeContainer # Added
+from ..widgets.tree_select import TreeSelect # Added
 
 class MainWindow(QMainWindow):
   """
@@ -33,10 +34,9 @@ class MainWindow(QMainWindow):
     # Top horizontal container
     h_splitter_top = ResizeContainer(orientation=Qt.Orientation.Horizontal, background_color="lightblue", parent=v_splitter_main)
     
-    label_tl = QLabel("Top-Left Pane", h_splitter_top)
-    label_tl.setAlignment(Qt.AlignmentFlag.AlignCenter)
-    label_tl.setStyleSheet("background-color: #e0f7fa; border: 1px solid #b2ebf2; padding: 5px;")
-    h_splitter_top.addWidget(label_tl)
+    # Create and add the TreeSelect widget to the top-left pane
+    tree_select_widget = TreeSelect(root_path=QDir.currentPath(), parent=h_splitter_top)
+    h_splitter_top.addWidget(tree_select_widget)
     
     label_tr = QLabel("Top-Right Pane", h_splitter_top)
     label_tr.setAlignment(Qt.AlignmentFlag.AlignCenter)
