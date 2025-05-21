@@ -11,7 +11,7 @@ start = "img_ops.app_main:main"  # To use the new dispatcher
 # OR, for direct CLI access:
  start_cli = "img_ops.cli.main:app"
 # OR, for direct GUI access:
- start_gui = "img_ops.gui.main:run_gui"
+start_gui = "img_ops.gui.main:run_gui"
 [tool.poetry]
 packages = [{ include = "img_ops", from = "src" }]
 [build-system]

@@ -8,3 +8,5 @@
 - There will also be a src/gui subfolder with all the GUI application & widget code.
 - All the GUI components should be as modular as possible, as configurable as possible, as reusable as possible.
 - Project features/functionality will be built incrementally, one step at a time.
+- Prefer pip packages to implement functionality rather than re-inventing the wheel
+- Suggest useful pip packages if not already installed

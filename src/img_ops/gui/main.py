@@ -5,7 +5,7 @@ This script initializes the QApplication and shows the main window.
 """
 import sys
 from PySide6.QtWidgets import QApplication
-# from .windows.main_window import MainWindow # To be created
+from .windows.main_window import MainWindow
 
 def run_gui():
   """
@@ -14,9 +14,9 @@ def run_gui():
   app = QApplication(sys.argv)
 
   # Create and show the main window
-  # main_win = MainWindow() # Placeholder
-  # main_win.show() # Placeholder
-  print("Placeholder: GUI app started. Main window would show here.") # Temporary
+  main_win = MainWindow()
+  main_win.show()
+  # print("Placeholder: GUI app started. Main window would show here.") # Temporary
 
   sys.exit(app.exec())
 

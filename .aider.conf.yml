@@ -1,4 +1,6 @@
 # aider conf for img-ops
 read:
   - README.md
-  - .roo/rules
+  - .roo/rules/python.md
+  - .roo/rules/project.md
+  - docs/folder_structure.md
