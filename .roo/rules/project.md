@@ -2,3 +2,9 @@
 - This application will be used to compare, analyze, sort, and move images from the local file system
 - This application will provide all functionality both through a command line/terminal interface, as well as a windowed GUI.
 - All the functionality will be provided in a common src/lib folder, which exports the functionality for use in the CLI & GUI interfaces
+- The project will support both terminal/CLI interface, as well as a Windowed Desktop GUI, built with `PySide6` QT GUI library.
+- The project source code will include a library folder which implements all the shared project functionality which will be provided to both the GUI & CLI interfaces.
+- There will also be a src/cli subfolder containing all the CLI code/functionality.
+- There will also be a src/gui subfolder with all the GUI application & widget code.
+- All the GUI components should be as modular as possible, as configurable as possible, as reusable as possible.
+- Project features/functionality will be built incrementally, one step at a time.
