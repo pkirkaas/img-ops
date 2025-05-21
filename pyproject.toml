@@ -4,10 +4,14 @@ version = "0.1.0"
 description = ""
 authors = [{ name = "Paul Kirkaas", email = "pkirkaas@gmail.com" }]
 readme = "README.md"
-requires-python = ">=3.13"
-dependencies = ["opencv-contrib-python (>=4.11.0.86,<5.0.0.0)"]
+requires-python = ">=3.13,<3.14"
+dependencies = ["opencv-contrib-python (>=4.11.0.86,<5.0.0.0)", "pyside6 (>=6.9.0,<7.0.0)"]
 [tool.poetry.scripts]
-start = "img_ops.main:start"
+start = "img_ops.app_main:main"  # To use the new dispatcher
+# OR, for direct CLI access:
+ start_cli = "img_ops.cli.main:app"
+# OR, for direct GUI access:
+ start_gui = "img_ops.gui.main:run_gui"
 [tool.poetry]
 packages = [{ include = "img_ops", from = "src" }]
 [build-system]
