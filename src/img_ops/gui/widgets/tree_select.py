@@ -11,10 +11,14 @@ from PySide6.QtWidgets import (
   QMessageBox,
   QDialog,
   QTextEdit,
-  QDialogButtonBox
+  QDialogButtonBox,
+  QHBoxLayout  # Added for button layout
 )
 from PySide6.QtCore import Qt, QModelIndex, QDir
-from typing import Dict, Set
+from typing import Dict, Set, List
+
+# Import the new function
+from src.img_ops.core.file_system import extract_paths
 
 class CheckableFileSystemModel(QFileSystemModel):
   """
@@ -55,11 +59,13 @@ class CheckableFileSystemModel(QFileSystemModel):
       self.check_states[file_path] = current_check_state
       self.dataChanged.emit(index, index, [Qt.ItemDataRole.CheckStateRole])
       
-      # Propagate check state to children if it's a directory
+      # Propagate check state to children if it's a directory (one-way propagation)
       if self.isDir(index) and current_check_state == Qt.CheckState.Checked:
         self._propagate_check_to_children(index, current_check_state)
-      # Note: Unchecking a parent does not automatically uncheck children in this simple version.
-      # More complex logic would be needed for tri-state checkboxes or recursive unchecking.
+      # Note: Unchecking a parent does not automatically uncheck children in this current implementation.
+      # For full parent-child check synchronization or tri-state behavior,
+      # this logic would need to be extended (e.g., iterating children on uncheck,
+      # or implementing tri-state for parent to reflect mixed child states).
       return True
     return super().setData(index, value, role)
 
@@ -92,24 +98,28 @@ class TreeSelect(QWidget):
   """
   A file system browser widget with a tree structure and checkboxes for selection.
   """
-  def __init__(self, root_path: str = QDir.currentPath(), parent: QWidget = None):
+  def __init__(self, initial_display_path: str = "", parent: QWidget = None):
     """
     Initializes the TreeSelect widget.
 
     Args:
-      root_path (str, optional): The initial root path for the file browser.
-                                 Defaults to QDir.currentPath().
+      initial_display_path (str, optional): The path to initially display in the tree.
+                                            Defaults to "" which shows system drives
+                                            (e.g., "This PC" on Windows, "/" on Linux).
       parent (QWidget, optional): The parent widget. Defaults to None.
     """
     super().__init__(parent)
 
     self.model = CheckableFileSystemModel(self)
-    self.model.setRootPath(root_path)
-    # self.model.setFilter(QDir.Filter.NoDotAndDotDot | QDir.Filter.AllEntries) # Show all
+    # Set the model's root to the conceptual file system root.
+    # This allows navigation anywhere if initial_display_path is deep.
+    self.model.setRootPath("")
 
     self.tree_view = QTreeView(self)
     self.tree_view.setModel(self.model)
-    self.tree_view.setRootIndex(self.model.index(root_path))
+    # Set what the view initially displays.
+    # If initial_display_path is "", model.index("") correctly points to "This PC" / drives.
+    self.tree_view.setRootIndex(self.model.index(initial_display_path))
     self.tree_view.setAnimated(True) # Optional: for smoother expand/collapse
     self.tree_view.setIndentation(20)
     self.tree_view.setSortingEnabled(True)
@@ -121,15 +131,50 @@ class TreeSelect(QWidget):
     
     # When an item is expanded, ensure its children are loaded if not already
     self.tree_view.expanded.connect(self._handle_expanded)
+    # Connect a signal to update the "Up" button when the root index changes (e.g. by double click)
+    # However, QTreeView doesn't have a direct rootIndexChanged signal.
+    # We will manage this via our navigation methods.
 
+    self.up_button = QPushButton("Up", self)
+    self.up_button.clicked.connect(self._navigate_up)
 
     self.show_selected_button = QPushButton("Show Selected", self)
     self.show_selected_button.clicked.connect(self._show_selected_items_dialog)
 
-    layout = QVBoxLayout(self)
-    layout.addWidget(self.tree_view)
-    layout.addWidget(self.show_selected_button)
-    self.setLayout(layout)
+    button_layout = QHBoxLayout()
+    button_layout.addWidget(self.up_button)
+    button_layout.addWidget(self.show_selected_button)
+
+    main_layout = QVBoxLayout(self)
+    main_layout.addWidget(self.tree_view)
+    main_layout.addLayout(button_layout)
+    self.setLayout(main_layout)
+
+    self._update_up_button_state() # Set initial state
+
+  def _navigate_up(self):
+    """
+    Navigates the tree view's root to its parent directory.
+    """
+    current_root = self.tree_view.rootIndex()
+    parent_of_current_root = current_root.parent()
+
+    if parent_of_current_root.isValid():
+      self.tree_view.setRootIndex(parent_of_current_root)
+      self._update_up_button_state()
+    # If parent is not valid, we are at the top-most level the view can show
+    # (which is the model's actual root, e.g., "This PC").
+
+  def _update_up_button_state(self):
+    """
+    Enables or disables the 'Up' button based on the current view root.
+    """
+    current_root = self.tree_view.rootIndex()
+    # The button is enabled if the parent of the current view root is a valid model index.
+    # This means we are not at the absolute root of what QFileSystemModel can show (e.g. "This PC").
+    can_go_up = current_root.parent().isValid()
+    self.up_button.setEnabled(can_go_up)
+
 
   def _handle_expanded(self, index: QModelIndex):
     """
@@ -144,23 +189,33 @@ class TreeSelect(QWidget):
   def _show_selected_items_dialog(self):
     """
     Displays a dialog box showing all currently selected (checked) items.
+    If directories are selected, it will list all files within those directories recursively.
     """
-    checked_items = self.model.get_checked_items()
+    checked_items_paths: Set[str] = self.model.get_checked_items()
 
-    if not checked_items:
+    if not checked_items_paths:
       QMessageBox.information(self, "Selected Items", "No items are currently selected.")
       return
 
+    # Use extract_paths to get all individual files
+    # Convert set to list for extract_paths function
+    all_file_paths: List[str] = extract_paths(list(checked_items_paths))
+
+    if not all_file_paths:
+      QMessageBox.information(self, "Selected Items", "No files found in the selected items (perhaps only empty directories were selected or paths were invalid).")
+      return
+      
     # Using a custom dialog for better text display
     dialog = QDialog(self)
-    dialog.setWindowTitle("Selected File System Items")
+    dialog.setWindowTitle("Selected Files") # Changed title to reflect it shows files
     dialog.setMinimumWidth(500)
     dialog.setMinimumHeight(300)
 
     layout = QVBoxLayout(dialog)
     text_edit = QTextEdit(dialog)
     text_edit.setReadOnly(True)
-    text_edit.setText("\n".join(sorted(list(checked_items))))
+    # Display the processed list of files
+    text_edit.setText("\n".join(sorted(all_file_paths)))
     layout.addWidget(text_edit)
 
     button_box = QDialogButtonBox(QDialogButtonBox.StandardButton.Ok, dialog)
@@ -170,12 +225,17 @@ class TreeSelect(QWidget):
     dialog.setLayout(layout)
     dialog.exec()
 
-  def setRootPath(self, path: str):
+  def setDisplayPath(self, path: str):
     """
-    Sets the root path for the file system browser.
+    Sets the path that the TreeView should display as its root.
+    The underlying QFileSystemModel still retains its full system access if initialized with rootPath("").
     """
-    self.model.setRootPath(path)
-    self.tree_view.setRootIndex(self.model.index(path))
+    target_index = self.model.index(path)
+    if target_index.isValid():
+      self.tree_view.setRootIndex(target_index)
+      self._update_up_button_state()
+    else:
+      print(f"Warning: TreeSelect.setDisplayPath - Path '{path}' is not valid in the model.")
 
 
 if __name__ == '__main__':
@@ -183,12 +243,13 @@ if __name__ == '__main__':
   from PySide6.QtWidgets import QApplication
 
   app = QApplication(sys.argv)
-  # Use a known directory for testing, e.g., the user's home directory or current dir
-  test_path = QDir.homePath() 
-  # test_path = "." # Or current directory
-
-  main_widget = TreeSelect(root_path=test_path)
-  main_widget.setWindowTitle(f"Test TreeSelect - Root: {test_path}")
+  # Test with default root (system drives / "This PC")
+  main_widget = TreeSelect()
+  main_widget.setWindowTitle(f"Test TreeSelect - Default Root")
+  # Example of setting a specific display path after initialization:
+  # test_display_path = QDir.homePath()
+  # main_widget.setDisplayPath(test_display_path)
+  # main_widget.setWindowTitle(f"Test TreeSelect - Root: {test_display_path}")
   main_widget.resize(600, 400)
   main_widget.show()
 

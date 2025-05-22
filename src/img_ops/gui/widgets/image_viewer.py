@@ -27,6 +27,7 @@ class ImageViewer(QWidget):
 
     layout = QVBoxLayout(self)
     layout.addWidget(self.image_label)
+    layout.setContentsMargins(0, 0, 0, 0) # Ensure image can use full widget area
     self.setLayout(layout)
 
     self.setMinimumSize(QSize(100, 100)) # Set a minimum size

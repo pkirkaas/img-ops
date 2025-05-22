@@ -2,9 +2,10 @@
 Defines the MainWindow class for the img-ops application.
 """
 from PySide6.QtWidgets import QMainWindow, QLabel, QVBoxLayout, QWidget
-from PySide6.QtCore import Qt, QDir # Added for Qt.Orientation and QDir
+from PySide6.QtCore import Qt # Added for Qt.Orientation
 from ..widgets.resize_container import ResizeContainer # Added
 from ..widgets.tree_select import TreeSelect # Added
+from ..widgets.image_viewer import ImageViewer # Added for image display
 
 class MainWindow(QMainWindow):
   """
@@ -35,7 +36,8 @@ class MainWindow(QMainWindow):
     h_splitter_top = ResizeContainer(orientation=Qt.Orientation.Horizontal, background_color="lightblue", parent=v_splitter_main)
     
     # Create and add the TreeSelect widget to the top-left pane
-    tree_select_widget = TreeSelect(root_path=QDir.currentPath(), parent=h_splitter_top)
+    # It will default to showing the system root ("This PC" / "/")
+    tree_select_widget = TreeSelect(parent=h_splitter_top)
     h_splitter_top.addWidget(tree_select_widget)
     
     label_tr = QLabel("Top-Right Pane", h_splitter_top)
@@ -48,10 +50,16 @@ class MainWindow(QMainWindow):
     # Bottom horizontal container
     h_splitter_bottom = ResizeContainer(orientation=Qt.Orientation.Horizontal, background_color="lightcoral", parent=v_splitter_main)
 
-    label_bl = QLabel("Bottom-Left Pane", h_splitter_bottom)
-    label_bl.setAlignment(Qt.AlignmentFlag.AlignCenter)
-    label_bl.setStyleSheet("background-color: #ffebee; border: 1px solid #ffcdd2; padding: 5px;")
-    h_splitter_bottom.addWidget(label_bl)
+    # Create and add the ImageViewer to the bottom-left pane
+    image_viewer_bl = ImageViewer(parent=h_splitter_bottom)
+    # It's good practice to ensure the path separator is correct for the OS,
+    # though Python's open and QPixmap are often flexible.
+    # For Windows paths given with backslashes in strings, they might need escaping
+    # or use raw strings r"Z:\..." or forward slashes "Z:/...".
+    # QPixmap should handle "Z:\Photos\FavG\465826_6adaadb6_crop.jpg" correctly on Windows.
+    image_path = r"Z:\Photos\FavG\465826_6adaadb6_crop.jpg"
+    image_viewer_bl.set_image_from_path(image_path)
+    h_splitter_bottom.addWidget(image_viewer_bl)
 
     label_br = QLabel("Bottom-Right Pane", h_splitter_bottom)
     label_br.setAlignment(Qt.AlignmentFlag.AlignCenter)
