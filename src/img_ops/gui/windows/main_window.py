@@ -6,6 +6,8 @@ from PySide6.QtCore import Qt # Added for Qt.Orientation
 from ..widgets.resize_container import ResizeContainer # Added
 from ..widgets.tree_select import TreeSelect # Added
 from ..widgets.image_viewer import ImageViewer # Added for image display
+from ..widgets.show_selected import ShowSelected # Added for showing selected files
+from ..state import AppState # Added for state management
 
 class MainWindow(QMainWindow):
   """
@@ -27,6 +29,9 @@ class MainWindow(QMainWindow):
 
     self.setWindowTitle("Img-Ops - Image Operations")
     self.setGeometry(100, 100, 900, 400) # x, y, width, height
+    
+    # Initialize the application state
+    self.app_state = AppState(self)
 
     # --- Central widget setup with ResizeContainers ---
     v_splitter_main = ResizeContainer(orientation=Qt.Orientation.Vertical, parent=self)
@@ -37,13 +42,14 @@ class MainWindow(QMainWindow):
     
     # Create and add the TreeSelect widget to the top-left pane
     # It will default to showing the system root ("This PC" / "/")
-    tree_select_widget = TreeSelect(parent=h_splitter_top)
-    h_splitter_top.addWidget(tree_select_widget)
+    self.tree_select_widget = TreeSelect(parent=h_splitter_top)
+    self.tree_select_widget.set_app_state(self.app_state)
+    h_splitter_top.addWidget(self.tree_select_widget)
     
-    label_tr = QLabel("Top-Right Pane", h_splitter_top)
-    label_tr.setAlignment(Qt.AlignmentFlag.AlignCenter)
-    label_tr.setStyleSheet("background-color: #e0f2f1; border: 1px solid #b2dfdb; padding: 5px;")
-    h_splitter_top.addWidget(label_tr)
+    # Create and add the ShowSelected widget to the top-right pane
+    self.show_selected_widget = ShowSelected(parent=h_splitter_top)
+    self.show_selected_widget.set_app_state(self.app_state)
+    h_splitter_top.addWidget(self.show_selected_widget)
     
     h_splitter_top.setWidgetSizes([150, 150]) # Initial sizes for top horizontal panes
 
@@ -51,15 +57,15 @@ class MainWindow(QMainWindow):
     h_splitter_bottom = ResizeContainer(orientation=Qt.Orientation.Horizontal, background_color="lightcoral", parent=v_splitter_main)
 
     # Create and add the ImageViewer to the bottom-left pane
-    image_viewer_bl = ImageViewer(parent=h_splitter_bottom)
+    self.image_viewer_bl = ImageViewer(parent=h_splitter_bottom)
     # It's good practice to ensure the path separator is correct for the OS,
     # though Python's open and QPixmap are often flexible.
     # For Windows paths given with backslashes in strings, they might need escaping
     # or use raw strings r"Z:\..." or forward slashes "Z:/...".
     # QPixmap should handle "Z:\Photos\FavG\465826_6adaadb6_crop.jpg" correctly on Windows.
     image_path = r"Z:\Photos\FavG\465826_6adaadb6_crop.jpg"
-    image_viewer_bl.set_image_from_path(image_path)
-    h_splitter_bottom.addWidget(image_viewer_bl)
+    self.image_viewer_bl.set_image_from_path(image_path)
+    h_splitter_bottom.addWidget(self.image_viewer_bl)
 
     label_br = QLabel("Bottom-Right Pane", h_splitter_bottom)
     label_br.setAlignment(Qt.AlignmentFlag.AlignCenter)
@@ -76,6 +82,31 @@ class MainWindow(QMainWindow):
     # TODO: Add menus, toolbars, status bar, and main content widgets
     self._create_menus()
     self._create_status_bar()
+    
+    # Connect additional signals for enhanced functionality
+    self._connect_signals()
+  
+  def _connect_signals(self):
+    """
+    Connect additional signals between widgets and state for enhanced functionality.
+    """
+    # Connect tree selection changes to update status bar
+    self.app_state.selected_paths_changed.connect(self._on_selection_changed)
+  
+  def _on_selection_changed(self, selected_paths):
+    """
+    Handle changes to the selected paths by updating the status bar.
+    
+    Args:
+      selected_paths (Set[str]): The new set of selected file paths.
+    """
+    count = len(selected_paths)
+    if count == 0:
+      self.statusBar().showMessage("Ready")
+    elif count == 1:
+      self.statusBar().showMessage(f"1 file selected")
+    else:
+      self.statusBar().showMessage(f"{count} files selected")
 
   def _create_menus(self):
     """

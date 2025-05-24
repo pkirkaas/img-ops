@@ -14,7 +14,7 @@ from PySide6.QtWidgets import (
   QDialogButtonBox,
   QHBoxLayout  # Added for button layout
 )
-from PySide6.QtCore import Qt, QModelIndex, QDir
+from PySide6.QtCore import Qt, QModelIndex, QDir, Signal
 from typing import Dict, Set, List
 
 # Import the new function
@@ -97,7 +97,14 @@ class CheckableFileSystemModel(QFileSystemModel):
 class TreeSelect(QWidget):
   """
   A file system browser widget with a tree structure and checkboxes for selection.
+  
+  Signals:
+    selection_changed: Emitted when the selection (checked items) changes.
+                      Args: selected_paths (Set[str]) - The new set of selected paths
   """
+  
+  # Signal emitted when selection changes
+  selection_changed = Signal(set)  # Set[str] of selected file paths
   def __init__(self, initial_display_path: str = "", parent: QWidget = None):
     """
     Initializes the TreeSelect widget.
@@ -114,6 +121,9 @@ class TreeSelect(QWidget):
     # Set the model's root to the conceptual file system root.
     # This allows navigation anywhere if initial_display_path is deep.
     self.model.setRootPath("")
+    
+    # Connect to model's dataChanged signal to emit our selection_changed signal
+    self.model.dataChanged.connect(self._on_model_data_changed)
 
     self.tree_view = QTreeView(self)
     self.tree_view.setModel(self.model)
@@ -151,6 +161,9 @@ class TreeSelect(QWidget):
     self.setLayout(main_layout)
 
     self._update_up_button_state() # Set initial state
+    
+    # Reference to the app state (will be set by the main window)
+    self._app_state = None
 
   def _navigate_up(self):
     """
@@ -236,6 +249,48 @@ class TreeSelect(QWidget):
       self._update_up_button_state()
     else:
       print(f"Warning: TreeSelect.setDisplayPath - Path '{path}' is not valid in the model.")
+  
+  def set_app_state(self, app_state):
+    """
+    Connect this widget to the application state.
+    
+    Args:
+      app_state (AppState): The application state manager.
+    """
+    self._app_state = app_state
+    
+    # Initialize the app state with current selection
+    if self._app_state:
+      current_selection = self.model.get_checked_items()
+      self._app_state.set_selected_paths(current_selection)
+  
+  def _on_model_data_changed(self, top_left: QModelIndex, bottom_right: QModelIndex, roles: list):
+    """
+    Handle changes to the model data, specifically check state changes.
+    
+    Args:
+      top_left (QModelIndex): The top-left index of the changed data.
+      bottom_right (QModelIndex): The bottom-right index of the changed data.
+      roles (list): The roles that changed.
+    """
+    # Check if the CheckStateRole was changed
+    if Qt.ItemDataRole.CheckStateRole in roles:
+      # Get the current selection and emit the signal
+      current_selection = self.model.get_checked_items()
+      self.selection_changed.emit(current_selection)
+      
+      # Update the app state if connected
+      if self._app_state:
+        self._app_state.set_selected_paths(current_selection)
+  
+  def get_selected_items(self) -> Set[str]:
+    """
+    Get the currently selected (checked) items.
+    
+    Returns:
+      Set[str]: The set of currently selected file paths.
+    """
+    return self.model.get_checked_items()
 
 
 if __name__ == '__main__':
