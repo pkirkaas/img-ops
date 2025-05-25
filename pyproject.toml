@@ -5,11 +5,20 @@ description = ""
 authors = [{ name = "Paul Kirkaas", email = "pkirkaas@gmail.com" }]
 readme = "README.md"
 requires-python = ">=3.13,<3.14"
-dependencies = ["opencv-contrib-python (>=4.11.0.86,<5.0.0.0)", "pyside6 (>=6.9.0,<7.0.0)"]
+dependencies = [
+  "opencv-contrib-python (>=4.11.0.86,<5.0.0.0)",
+  "pyside6 (>=6.9.0,<7.0.0)",
+  "pillow (>=11.2.1,<12.0.0)",
+  "scikit-image (>=0.25.2,<0.26.0)",
+  "numpy (>=2.2.6,<3.0.0)",
+  "pydantic (>=2.11.5,<3.0.0)",
+  "pyyaml (>=6.0.2,<7.0.0)",
+  "platformdirs (>=4.3.8,<5.0.0)",
+]
 [tool.poetry.scripts]
-start = "img_ops.app_main:main"  # To use the new dispatcher
+start = "img_ops.app_main:main" # To use the new dispatcher
 # OR, for direct CLI access:
- start_cli = "img_ops.cli.main:app"
+start_cli = "img_ops.cli.main:app"
 # OR, for direct GUI access:
 start_gui = "img_ops.gui.main:run_gui"
 [tool.poetry]

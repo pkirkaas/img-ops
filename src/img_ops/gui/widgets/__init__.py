@@ -11,10 +11,14 @@ from .show_selected import ShowSelected
 from .tree_select import TreeSelect
 from .image_viewer import ImageViewer
 from .resize_container import ResizeContainer
+from .app_config_widget import AppConfigWidget
+from .current_config_display import CurrentConfigDisplay
 
 __all__ = [
     'ShowSelected',
     'TreeSelect',
     'ImageViewer',
-    'ResizeContainer'
+    'ResizeContainer',
+    'AppConfigWidget',
+    'CurrentConfigDisplay'
 ]

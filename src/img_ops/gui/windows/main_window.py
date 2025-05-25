@@ -1,13 +1,17 @@
 """
 Defines the MainWindow class for the img-ops application.
 """
-from PySide6.QtWidgets import QMainWindow, QLabel, QVBoxLayout, QWidget
-from PySide6.QtCore import Qt # Added for Qt.Orientation
-from ..widgets.resize_container import ResizeContainer # Added
-from ..widgets.tree_select import TreeSelect # Added
-from ..widgets.image_viewer import ImageViewer # Added for image display
-from ..widgets.show_selected import ShowSelected # Added for showing selected files
-from ..state import AppState # Added for state management
+from PySide6.QtWidgets import (QMainWindow, QLabel, QVBoxLayout, QWidget, QDialog,
+                            QMessageBox)
+from PySide6.QtCore import Qt
+from ..widgets.resize_container import ResizeContainer
+from ..widgets.tree_select import TreeSelect
+from ..widgets.image_viewer import ImageViewer
+from ..widgets.show_selected import ShowSelected
+from ..widgets.app_config_widget import AppConfigWidget
+from ..widgets.current_config_display import CurrentConfigDisplay
+from ..state import AppState
+from ...core.app_config import AppConfiguration, get_config_manager
 
 class MainWindow(QMainWindow):
   """
@@ -29,9 +33,13 @@ class MainWindow(QMainWindow):
 
     self.setWindowTitle("Img-Ops - Image Operations")
     self.setGeometry(100, 100, 900, 400) # x, y, width, height
-    
+
     # Initialize the application state
     self.app_state = AppState(self)
+
+    # Initialize configuration management
+    self.config_manager = get_config_manager()
+    self.app_config = self.config_manager.load_config()
 
     # --- Central widget setup with ResizeContainers ---
     v_splitter_main = ResizeContainer(orientation=Qt.Orientation.Vertical, parent=self)
@@ -79,7 +87,10 @@ class MainWindow(QMainWindow):
     v_splitter_main.addWidget(h_splitter_bottom)
     v_splitter_main.setWidgetSizes([200, 200]) # Initial sizes for vertical split
 
-    # TODO: Add menus, toolbars, status bar, and main content widgets
+    # Add configuration display widget to the status bar area
+    self.config_display = CurrentConfigDisplay(self.app_config, parent=self)
+    self.statusBar().addPermanentWidget(self.config_display, stretch=1)
+
     self._create_menus()
     self._create_status_bar()
     
@@ -113,10 +124,15 @@ class MainWindow(QMainWindow):
     Creates the main menu bar and its actions.
     """
     menu_bar = self.menuBar()
-    file_menu = menu_bar.addMenu("&File")
 
-    # Example actions (to be implemented)
+    # File menu
+    file_menu = menu_bar.addMenu("&File")
     open_action = file_menu.addAction("&Open...")
+
+    # Settings menu with configuration option
+    settings_menu = menu_bar.addMenu("&Settings")
+    config_action = settings_menu.addAction("&Configuration...")
+    config_action.triggered.connect(self._show_config_dialog)
     # open_action.triggered.connect(self.open_file_dialog)
     exit_action = file_menu.addAction("E&xit")
     exit_action.triggered.connect(self.close)
@@ -137,6 +153,29 @@ class MainWindow(QMainWindow):
 
   # def show_about_dialog(self):
   #   print("Placeholder: Show about dialog triggered.")
+
+def _show_config_dialog(self):
+  """
+  Shows the configuration dialog and handles the result.
+
+  Creates an AppConfigWidget dialog, shows it modally, and if accepted,
+  updates the current configuration and refreshes the display.
+  """
+  dialog = AppConfigWidget(self.app_config, parent=self)
+
+  if dialog.exec() == QDialog.DialogCode.Accepted:
+      try:
+          new_config = dialog.get_config()
+          self.app_config = new_config
+          self.config_manager.save_config(new_config)
+          self.config_display.update_config(new_config)
+          self.statusBar().showMessage("Configuration updated successfully", 3000)
+      except Exception as e:
+          QMessageBox.warning(
+              self,
+              "Configuration Error",
+              f"Failed to update configuration: {str(e)}"
+          )
 
 if __name__ == '__main__':
   # This part is for testing the MainWindow independently
