@@ -114,8 +114,8 @@ class CurrentConfigDisplay(QWidget):
         paths_text = "\n".join(config.paths) if config.paths else "No paths configured"
         self.paths_label.setPlainText(paths_text)
 
-        self.method_label.setText(config.similarity_method.value if config.similarity_method else "Not set")
-        self.percentage_label.setText(f"{config.similarity_percentage}%" if config.similarity_percentage is not None else "Not set")
+        self.method_label.setText(config.method if config.method else "Not set")
+        self.percentage_label.setText(f"{config.percent}%" if config.percent is not None else "Not set")
 
     def _clear_display(self):
         """Clear all fields in the display."""

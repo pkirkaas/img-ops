@@ -71,38 +71,38 @@ class ConfigEditDialog(QDialog):
     self.setWindowTitle("Edit Configuration" if self.config.name != "MyConf" else "New Configuration")
     self.setModal(True)
     self.setMinimumSize(500, 600)
-    
+
     # Main layout
     layout = QVBoxLayout(self)
-    
+
     # Basic information group
     basic_group = QGroupBox("Basic Information")
     basic_layout = QFormLayout(basic_group)
-    
+
     # Name field
     self.name_edit = QLineEdit()
     self.name_edit.setMaxLength(100)
     self.name_edit.setPlaceholderText("Enter configuration name")
     basic_layout.addRow("Name:", self.name_edit)
-    
+
     # Description field
     self.description_edit = QTextEdit()
     self.description_edit.setMaximumHeight(80)
     self.description_edit.setPlaceholderText("Enter configuration description")
     basic_layout.addRow("Description:", self.description_edit)
-    
+
     layout.addWidget(basic_group)
-    
+
     # Comparison settings group
     comparison_group = QGroupBox("Comparison Settings")
     comparison_layout = QFormLayout(comparison_group)
-    
+
     # Method selection
     self.method_combo = QComboBox()
     self.method_combo.addItems(['phash', 'ssim', 'orb', 'sift', 'surf', 'histogram'])
     self.method_combo.setToolTip("Select the similarity comparison method")
     comparison_layout.addRow("Method:", self.method_combo)
-    
+
     # Similarity percentage
     self.percent_spin = QDoubleSpinBox()
     self.percent_spin.setRange(0.0, 100.0)
@@ -110,51 +110,52 @@ class ConfigEditDialog(QDialog):
     self.percent_spin.setSuffix("%")
     self.percent_spin.setToolTip("Similarity threshold percentage (0-100)")
     comparison_layout.addRow("Similarity %:", self.percent_spin)
-    
+
     layout.addWidget(comparison_group)
-    
+
     # Paths group
     paths_group = QGroupBox("File Paths")
     paths_layout = QVBoxLayout(paths_group)
-    
+
     # Paths list
     self.paths_list = QListWidget()
     self.paths_list.setMinimumHeight(150)
     self.paths_list.setToolTip("List of file and directory paths to process")
     paths_layout.addWidget(self.paths_list)
-    
+
     # Path buttons
     path_buttons_layout = QHBoxLayout()
-    
+
     self.add_file_btn = QPushButton("Add File")
     self.add_file_btn.setToolTip("Add a single file to the configuration")
     path_buttons_layout.addWidget(self.add_file_btn)
-    
+
     self.add_dir_btn = QPushButton("Add Directory")
     self.add_dir_btn.setToolTip("Add a directory to the configuration")
     path_buttons_layout.addWidget(self.add_dir_btn)
-    
+
     self.remove_path_btn = QPushButton("Remove Selected")
     self.remove_path_btn.setToolTip("Remove the selected path from the list")
     self.remove_path_btn.setEnabled(False)
     path_buttons_layout.addWidget(self.remove_path_btn)
-    
+
     self.clear_paths_btn = QPushButton("Clear All")
     self.clear_paths_btn.setToolTip("Remove all paths from the list")
     path_buttons_layout.addWidget(self.clear_paths_btn)
-    
+
     paths_layout.addLayout(path_buttons_layout)
     layout.addWidget(paths_group)
-    
+
     # Dialog buttons
     self.button_box = QDialogButtonBox(
       QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel
     )
     layout.addWidget(self.button_box)
-    
+
     # Apply styling
     self._apply_styling()
-def _apply_styling(self):
+
+  def _apply_styling(self):
     """Apply consistent styling to the dialog components."""
     # Style group boxes
     group_style = """
@@ -195,7 +196,7 @@ def _apply_styling(self):
       }
     """)
   
-def _populate_fields(self):
+  def _populate_fields(self):
     """Populate form fields with configuration data."""
     self.name_edit.setText(self.config.name)
     self.description_edit.setPlainText(self.config.description)
@@ -211,7 +212,7 @@ def _populate_fields(self):
     for path in self.config.paths:
       self.paths_list.addItem(path)
   
-def _connect_signals(self):
+  def _connect_signals(self):
     """Connect widget signals to their handlers."""
     # Dialog buttons
     self.button_box.accepted.connect(self._validate_and_accept)
@@ -229,8 +230,8 @@ def _connect_signals(self):
     # Validation on name change
     self.name_edit.textChanged.connect(self._validate_name)
   
-@Slot()
-def _add_file_path(self):
+  @Slot()
+  def _add_file_path(self):
     """Add a file path through file dialog."""
     file_path, _ = QFileDialog.getOpenFileName(
       self,
@@ -242,8 +243,8 @@ def _add_file_path(self):
     if file_path:
       self._add_path_to_list(file_path)
   
-@Slot()
-def _add_directory_path(self):
+  @Slot()
+  def _add_directory_path(self):
     """Add a directory path through directory dialog."""
     dir_path = QFileDialog.getExistingDirectory(
       self,
@@ -256,36 +257,36 @@ def _add_directory_path(self):
   def _add_path_to_list(self, path: str):
     """
     Add a path to the paths list if it's not already present.
-    
+
     Args:
       path (str): The file or directory path to add.
     """
     # Normalize path for comparison
     normalized_path = os.path.normpath(path)
-    
+
     # Check if path already exists
     for i in range(self.paths_list.count()):
       existing_path = self.paths_list.item(i).text()
       if os.path.normpath(existing_path) == normalized_path:
         QMessageBox.information(self, "Duplicate Path", f"Path already exists:\n{path}")
         return
-    
+
     # Add the path
     self.paths_list.addItem(path)
-  
-@Slot()
+
+  @Slot()
   def _remove_selected_path(self):
     """Remove the currently selected path from the list."""
     current_row = self.paths_list.currentRow()
     if current_row >= 0:
       self.paths_list.takeItem(current_row)
-  
-@Slot()
+
+  @Slot()
   def _clear_all_paths(self):
     """Clear all paths from the list after confirmation."""
     if self.paths_list.count() == 0:
       return
-    
+
     reply = QMessageBox.question(
       self,
       "Clear All Paths",
@@ -293,21 +294,21 @@ def _add_directory_path(self):
       QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
       QMessageBox.StandardButton.No
     )
-    
+
     if reply == QMessageBox.StandardButton.Yes:
       self.paths_list.clear()
-  
-@Slot()
+
+  @Slot()
   def _on_path_selection_changed(self):
     """Handle path selection changes."""
     has_selection = self.paths_list.currentRow() >= 0
     self.remove_path_btn.setEnabled(has_selection)
-  
+
   @Slot(str)
   def _validate_name(self, name: str):
     """
     Validate the configuration name.
-    
+
     Args:
       name (str): The name to validate.
     """
@@ -315,16 +316,16 @@ def _add_directory_path(self):
     if not name.strip():
       self.name_edit.setStyleSheet("border: 2px solid red;")
       return
-    
+
     # Check if name already exists (excluding original name for edits)
     if name in self.existing_names and name != self.original_name:
       self.name_edit.setStyleSheet("border: 2px solid red;")
       return
-    
+
     # Name is valid
     self.name_edit.setStyleSheet("")
   
-def _validate_and_accept(self):
+  def _validate_and_accept(self):
     """Validate all fields and accept the dialog if valid."""
     # Validate name
     name = self.name_edit.text().strip()
@@ -363,7 +364,7 @@ def _validate_and_accept(self):
   def get_configuration(self) -> AppConfiguration:
     """
     Get the edited configuration.
-    
+
     Returns:
       AppConfiguration: The configuration with updated values.
     """
@@ -389,130 +390,31 @@ class AppConfigWidget(QWidget):
   configuration_changed = Signal(str)  # config_name
   configuration_selected = Signal(AppConfiguration)  # config
   
-  def __init__(self, config_manager: Optional[AppConfigManager] = None, parent=None):
+  def __init__(self, config_manager: AppConfigManager, current_config_name: Optional[str] = None, parent=None):
     """
     Initialize the AppConfigWidget.
     
     Args:
-      config_manager (AppConfigManager, optional): Configuration manager instance.
-                                                  If None, creates a new one.
+      config_manager (AppConfigManager): Configuration manager instance.
+      current_config_name (str, optional): Name of the initially selected configuration.
       parent (QWidget, optional): Parent widget.
     """
     super().__init__(parent)
     
-    self.config_manager = config_manager or AppConfigManager()
-    self.current_config: Optional[AppConfiguration] = None
+    self.config_manager = config_manager
+    self.current_config: Optional[AppConfiguration] = None # This will be set by selection
     
     self._setup_ui()
     self._connect_signals()
     self._refresh_config_list()
-def _add_directory_path(self):
-    """Add a directory path through directory dialog."""
-    dir_path = QFileDialog.getExistingDirectory(
-      self,
-      "Select Directory"
-    )
 
-    if dir_path:
-      self._add_path_to_list(dir_path)
+    if current_config_name:
+      self.set_selected_configuration(current_config_name)
+    elif self.config_list.count() > 0: # Select first item if no specific one is given
+        self.config_list.setCurrentRow(0)
 
-@Slot()
-def _remove_selected_path(self):
-    """Remove the currently selected path from the list."""
-    current_row = self.paths_list.currentRow()
-    if current_row >= 0:
-      self.paths_list.takeItem(current_row)
 
-@Slot()
-def _clear_all_paths(self):
-    """Clear all paths from the list after confirmation."""
-    if self.paths_list.count() == 0:
-      return
-
-    reply = QMessageBox.question(
-      self,
-      "Clear All Paths",
-      "Are you sure you want to remove all paths?",
-      QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
-      QMessageBox.StandardButton.No
-    )
-
-    if reply == QMessageBox.StandardButton.Yes:
-      self.paths_list.clear()
-
-@Slot()
-def _on_path_selection_changed(self):
-    """Handle path selection changes."""
-    has_selection = self.paths_list.currentRow() >= 0
-    self.remove_path_btn.setEnabled(has_selection)
-
-@Slot(str)
-def _validate_name(self, name: str):
-    """
-    Validate the configuration name.
-
-    Args:
-      name (str): The name to validate.
-    """
-    # Check if name is empty
-    if not name.strip():
-      self.name_edit.setStyleSheet("border: 2px solid red;")
-      return
-
-    # Check if name already exists (excluding original name for edits)
-    if name in self.existing_names and name != self.original_name:
-      self.name_edit.setStyleSheet("border: 2px solid red;")
-      return
-
-    # Name is valid
-    self.name_edit.setStyleSheet("")
-
-def _validate_and_accept(self):
-    """Validate all fields and accept the dialog if valid."""
-    # Validate name
-    name = self.name_edit.text().strip()
-    if not name:
-      QMessageBox.warning(self, "Invalid Name", "Configuration name cannot be empty.")
-      self.name_edit.setFocus()
-      return
-
-    if name in self.existing_names and name != self.original_name:
-      QMessageBox.warning(self, "Duplicate Name", f"Configuration name '{name}' already exists.")
-      self.name_edit.setFocus()
-      return
-
-    # Update configuration
-    try:
-      self.config.name = name
-      self.config.description = self.description_edit.toPlainText().strip()
-      self.config.method = self.method_combo.currentText()
-      self.config.percent = self.percent_spin.value()
-
-      # Update paths
-      paths = []
-      for i in range(self.paths_list.count()):
-        paths.append(self.paths_list.item(i).text())
-      self.config.paths = paths
-
-      # Validate the configuration (this will trigger Pydantic validation)
-      AppConfiguration(**self.config.dict())
-
-    except Exception as e:
-      QMessageBox.critical(self, "Validation Error", f"Configuration validation failed:\n{str(e)}")
-      return
-
-    self.accept()
-
-def get_configuration(self) -> AppConfiguration:
-    """
-    Get the edited configuration.
-
-    Returns:
-      AppConfiguration: The configuration with updated values.
-    """
-    return self.config
-
-def _setup_ui(self):
+  def _setup_ui(self):
     """Set up the user interface components."""
     # Main layout
     main_layout = QVBoxLayout(self)
@@ -603,7 +505,7 @@ def _setup_ui(self):
     # Apply styling
     self._apply_styling()
 
-def _apply_styling(self):
+  def _apply_styling(self):
     """Apply consistent styling to the widget components."""
     # Style the configuration list
     self.config_list.setStyleSheet("""
@@ -667,7 +569,7 @@ def _apply_styling(self):
     for button in self.findChildren(QPushButton):
       button.setStyleSheet(button_style)
 
-def _connect_signals(self):
+  def _connect_signals(self):
     """Connect widget signals to their handlers."""
     # List selection
     self.config_list.itemSelectionChanged.connect(self._on_config_selection_changed)
@@ -681,7 +583,7 @@ def _connect_signals(self):
     self.ok_btn.clicked.connect(self._on_ok_clicked)
     self.cancel_btn.clicked.connect(self._on_cancel_clicked)
 
-def _refresh_config_list(self):
+  def _refresh_config_list(self):
     """Refresh the configuration list from the manager."""
     self.config_list.clear()
 
@@ -696,8 +598,8 @@ def _refresh_config_list(self):
       self.details_text.clear()
       self.current_config = None
 
-@Slot()
-def _on_config_selection_changed(self):
+  @Slot()
+  def _on_config_selection_changed(self):
     """Handle configuration selection changes."""
     current_item = self.config_list.currentItem()
     has_selection = current_item is not None
@@ -718,7 +620,7 @@ def _on_config_selection_changed(self):
       self.current_config = None
       self.details_text.clear()
 
-def _display_config_details(self, config: AppConfiguration):
+  def _display_config_details(self, config: AppConfiguration):
     """
     Display configuration details in the details panel.
 
@@ -750,8 +652,8 @@ def _display_config_details(self, config: AppConfiguration):
 
     self.details_text.setPlainText("\n".join(details))
 
-@Slot()
-def _create_new_configuration(self):
+  @Slot()
+  def _create_new_configuration(self):
     """Create a new configuration."""
     existing_names = self.config_manager.list_configuration_names()
 
@@ -777,8 +679,8 @@ def _create_new_configuration(self):
       except Exception as e:
         QMessageBox.critical(self, "Unexpected Error", f"An unexpected error occurred:\n{str(e)}")
 
-@Slot()
-def _edit_configuration(self):
+  @Slot()
+  def _edit_configuration(self):
     """Edit the selected configuration."""
     if not self.current_config:
       return
@@ -816,8 +718,8 @@ def _edit_configuration(self):
       except Exception as e:
         QMessageBox.critical(self, "Unexpected Error", f"An unexpected error occurred:\n{str(e)}")
 
-@Slot()
-def _delete_configuration(self):
+  @Slot()
+  def _delete_configuration(self):
     """Delete the selected configuration."""
     if not self.current_config:
       return
@@ -845,7 +747,7 @@ def _delete_configuration(self):
       except Exception as e:
         QMessageBox.critical(self, "Unexpected Error", f"An unexpected error occurred:\n{str(e)}")
 
-def _select_config_by_name(self, name: str):
+  def _select_config_by_name(self, name: str):
     """
     Select a configuration by name in the list.
 
@@ -858,8 +760,8 @@ def _select_config_by_name(self, name: str):
         self.config_list.setCurrentItem(item)
         break
 
-@Slot()
-def _on_ok_clicked(self):
+  @Slot()
+  def _on_ok_clicked(self):
     """Handle OK button click."""
     # Save any pending changes
     try:
@@ -872,8 +774,8 @@ def _on_ok_clicked(self):
     if self.parent() and hasattr(self.parent(), 'accept'):
       self.parent().accept()
 
-@Slot()
-def _on_cancel_clicked(self):
+  @Slot()
+  def _on_cancel_clicked(self):
     """Handle Cancel button click."""
     # Reload configurations to discard any unsaved changes
     try:
@@ -887,16 +789,31 @@ def _on_cancel_clicked(self):
     if self.parent() and hasattr(self.parent(), 'reject'):
       self.parent().reject()
 
-def get_selected_configuration(self) -> Optional[AppConfiguration]:
+  def get_selected_configuration(self) -> Optional[AppConfiguration]:
     """
-    Get the currently selected configuration.
+    Get the currently selected AppConfiguration object.
 
     Returns:
       AppConfiguration or None: The selected configuration, or None if none selected.
     """
     return self.current_config
 
-def set_selected_configuration(self, name: str) -> bool:
+  def get_selected_config_name(self) -> Optional[str]:
+    """
+    Get the name of the currently selected configuration in the list.
+
+    Returns:
+      str or None: The name of the selected configuration, or None if no selection.
+    """
+    current_item = self.config_list.currentItem()
+    if current_item:
+      return current_item.data(Qt.ItemDataRole.UserRole)
+    # Fallback if somehow current_item is None but current_config is set
+    if self.current_config:
+      return self.current_config.name
+    return None
+
+  def set_selected_configuration(self, name: str) -> bool:
     """
     Set the selected configuration by name.
 

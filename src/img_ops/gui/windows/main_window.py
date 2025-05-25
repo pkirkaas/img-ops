@@ -39,7 +39,7 @@ class MainWindow(QMainWindow):
 
     # Initialize configuration management
     self.config_manager = get_config_manager()
-    self.app_config = self.config_manager.load_config()
+    self.app_config = self.config_manager.get_default_configuration()
 
     # --- Central widget setup with ResizeContainers ---
     v_splitter_main = ResizeContainer(orientation=Qt.Orientation.Vertical, parent=self)
@@ -88,7 +88,8 @@ class MainWindow(QMainWindow):
     v_splitter_main.setWidgetSizes([200, 200]) # Initial sizes for vertical split
 
     # Add configuration display widget to the status bar area
-    self.config_display = CurrentConfigDisplay(self.app_config, parent=self)
+    self.config_display = CurrentConfigDisplay(parent=self)
+    self.config_display.update_display(self.app_config) # Populate the display
     self.statusBar().addPermanentWidget(self.config_display, stretch=1)
 
     self._create_menus()
@@ -154,28 +155,61 @@ class MainWindow(QMainWindow):
   # def show_about_dialog(self):
   #   print("Placeholder: Show about dialog triggered.")
 
-def _show_config_dialog(self):
-  """
-  Shows the configuration dialog and handles the result.
+  def _show_config_dialog(self):
+    """
+    Shows the configuration dialog and handles the result.
 
-  Creates an AppConfigWidget dialog, shows it modally, and if accepted,
-  updates the current configuration and refreshes the display.
-  """
-  dialog = AppConfigWidget(self.app_config, parent=self)
+    Creates an AppConfigWidget dialog, shows it modally, and if accepted,
+    updates the current configuration and refreshes the display.
+    """
+    # Create a QDialog to host the AppConfigWidget
+    config_dialog = QDialog(self)
+    config_dialog.setWindowTitle("Application Configuration")
+    config_dialog.setMinimumSize(700, 500) # Adjust size as needed
 
-  if dialog.exec() == QDialog.DialogCode.Accepted:
-      try:
-          new_config = dialog.get_config()
-          self.app_config = new_config
-          self.config_manager.save_config(new_config)
-          self.config_display.update_config(new_config)
-          self.statusBar().showMessage("Configuration updated successfully", 3000)
-      except Exception as e:
-          QMessageBox.warning(
-              self,
-              "Configuration Error",
-              f"Failed to update configuration: {str(e)}"
-          )
+    # Create the AppConfigWidget instance
+    # Pass config_dialog as parent so AppConfigWidget can call accept/reject on it
+    app_config_widget = AppConfigWidget(config_manager=self.config_manager,
+                                        current_config_name=self.app_config.name,
+                                        parent=config_dialog)
+
+    # Set up layout for the QDialog
+    dialog_layout = QVBoxLayout(config_dialog)
+    dialog_layout.addWidget(app_config_widget)
+    config_dialog.setLayout(dialog_layout)
+    
+    # Show the dialog modally
+    if config_dialog.exec() == QDialog.DialogCode.Accepted:
+        try:
+            # The AppConfigWidget handles saving via its OK button.
+            # We retrieve the name of the configuration that was selected or active
+            # when the dialog was accepted.
+            updated_config_name = app_config_widget.get_selected_config_name()
+            if updated_config_name:
+              self.app_config = self.config_manager.get_configuration(updated_config_name)
+              if self.app_config:
+                self.config_display.update_display(self.app_config)
+                self.statusBar().showMessage(f"Configuration '{self.app_config.name}' loaded.", 3000)
+              else:
+                # Fallback to default if the selected one somehow isn't found
+                self.app_config = self.config_manager.get_default_configuration()
+                self.config_display.update_display(self.app_config)
+                QMessageBox.warning(self, "Configuration Error", f"Could not load configuration: {updated_config_name}. Reverted to default.")
+            else: # If no specific config was selected, refresh with current (possibly default)
+                self.app_config = self.config_manager.get_configuration(self.app_config.name) or self.config_manager.get_default_configuration()
+                self.config_display.update_display(self.app_config)
+
+            # The AppConfigWidget should call self.config_manager.save_to_file() internally upon acceptance.
+            # If not, we might need to call it here:
+            # self.config_manager.save_to_file()
+            # For now, assuming the widget handles saving.
+
+        except Exception as e:
+            QMessageBox.warning(
+                self,
+                "Configuration Error",
+                f"Failed to update or apply configuration: {str(e)}"
+            )
 
 if __name__ == '__main__':
   # This part is for testing the MainWindow independently
