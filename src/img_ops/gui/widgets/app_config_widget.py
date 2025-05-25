@@ -37,6 +37,31 @@ from PySide6.QtGui import QFont
 from ...core.app_config import AppConfigManager, AppConfiguration
 from ...core.exceptions import ConfigError
 
+# Helper function for selectable QMessageBox
+def show_selectable_message_box(parent: QWidget, icon_type: QMessageBox.Icon, title: str, text: str, informative_text: str = "", detailed_text: str = ""):
+    """
+    Displays a QMessageBox with selectable text.
+
+    Args:
+        parent (QWidget): The parent widget.
+        icon_type (QMessageBox.Icon): The icon to display (e.g., QMessageBox.Critical).
+        title (str): The window title of the message box.
+        text (str): The main text of the message box.
+        informative_text (str, optional): Additional informative text.
+        detailed_text (str, optional): Detailed text for a details area.
+    """
+    msg_box = QMessageBox(parent)
+    msg_box.setIcon(icon_type)
+    msg_box.setWindowTitle(title)
+    msg_box.setText(text)
+    if informative_text:
+        msg_box.setInformativeText(informative_text)
+    if detailed_text:
+        msg_box.setDetailedText(detailed_text)
+    
+    msg_box.setTextInteractionFlags(Qt.TextSelectableByMouse | Qt.TextSelectableByKeyboard)
+    return msg_box.exec()
+
 
 class ConfigEditDialog(QDialog):
   """
@@ -268,7 +293,7 @@ class ConfigEditDialog(QDialog):
     for i in range(self.paths_list.count()):
       existing_path = self.paths_list.item(i).text()
       if os.path.normpath(existing_path) == normalized_path:
-        QMessageBox.information(self, "Duplicate Path", f"Path already exists:\n{path}")
+        show_selectable_message_box(self, QMessageBox.Information, "Duplicate Path", f"Path already exists:\n{path}")
         return
 
     # Add the path
@@ -330,12 +355,12 @@ class ConfigEditDialog(QDialog):
     # Validate name
     name = self.name_edit.text().strip()
     if not name:
-      QMessageBox.warning(self, "Invalid Name", "Configuration name cannot be empty.")
+      show_selectable_message_box(self, QMessageBox.Warning, "Invalid Name", "Configuration name cannot be empty.")
       self.name_edit.setFocus()
       return
     
     if name in self.existing_names and name != self.original_name:
-      QMessageBox.warning(self, "Duplicate Name", f"Configuration name '{name}' already exists.")
+      show_selectable_message_box(self, QMessageBox.Warning, "Duplicate Name", f"Configuration name '{name}' already exists.")
       self.name_edit.setFocus()
       return
     
@@ -356,7 +381,7 @@ class ConfigEditDialog(QDialog):
       self.config = validated_config
       
     except Exception as e: # Catches Pydantic validation errors and other potential issues
-      QMessageBox.critical(self, "Validation Error", f"Configuration validation failed:\n{str(e)}")
+      show_selectable_message_box(self, QMessageBox.Critical, "Validation Error", f"Configuration validation failed:\n{str(e)}")
       return # Do not accept the dialog if validation fails
     
     self.accept() # Accept the dialog only if validation and assignment were successful
@@ -673,11 +698,11 @@ class AppConfigWidget(QWidget):
           self._select_config_by_name(new_config.name)
           self.configuration_changed.emit(new_config.name)
         else:
-          QMessageBox.warning(self, "Error", f"Configuration '{new_config.name}' already exists.")
+          show_selectable_message_box(self, QMessageBox.Warning, "Error", f"Configuration '{new_config.name}' already exists.")
       except ConfigError as e:
-        QMessageBox.critical(self, "Configuration Error", f"Failed to save configuration:\n{str(e)}")
+        show_selectable_message_box(self, QMessageBox.Critical, "Configuration Error", f"Failed to save configuration:\n{str(e)}")
       except Exception as e:
-        QMessageBox.critical(self, "Unexpected Error", f"An unexpected error occurred:\n{str(e)}")
+        show_selectable_message_box(self, QMessageBox.Critical, "Unexpected Error", f"An unexpected error occurred:\n{str(e)}")
 
   @Slot()
   def _edit_configuration(self):
@@ -714,9 +739,9 @@ class AppConfigWidget(QWidget):
         self.configuration_changed.emit(edited_config.name)
 
       except ConfigError as e:
-        QMessageBox.critical(self, "Configuration Error", f"Failed to save configuration:\n{str(e)}")
+        show_selectable_message_box(self, QMessageBox.Critical, "Configuration Error", f"Failed to save configuration:\n{str(e)}")
       except Exception as e:
-        QMessageBox.critical(self, "Unexpected Error", f"An unexpected error occurred:\n{str(e)}")
+        show_selectable_message_box(self, QMessageBox.Critical, "Unexpected Error", f"An unexpected error occurred:\n{str(e)}")
 
   @Slot()
   def _delete_configuration(self):
@@ -741,11 +766,11 @@ class AppConfigWidget(QWidget):
           self._refresh_config_list()
           self.configuration_changed.emit(config_name)
         else:
-          QMessageBox.warning(self, "Error", f"Configuration '{config_name}' not found.")
+          show_selectable_message_box(self, QMessageBox.Warning, "Error", f"Configuration '{config_name}' not found.")
       except ConfigError as e:
-        QMessageBox.critical(self, "Configuration Error", f"Failed to delete configuration:\n{str(e)}")
+        show_selectable_message_box(self, QMessageBox.Critical, "Configuration Error", f"Failed to delete configuration:\n{str(e)}")
       except Exception as e:
-        QMessageBox.critical(self, "Unexpected Error", f"An unexpected error occurred:\n{str(e)}")
+        show_selectable_message_box(self, QMessageBox.Critical, "Unexpected Error", f"An unexpected error occurred:\n{str(e)}")
 
   def _select_config_by_name(self, name: str):
     """
@@ -767,7 +792,7 @@ class AppConfigWidget(QWidget):
     try:
       self.config_manager.save_to_file()
     except ConfigError as e:
-      QMessageBox.critical(self, "Save Error", f"Failed to save configurations:\n{str(e)}")
+      show_selectable_message_box(self, QMessageBox.Critical, "Save Error", f"Failed to save configurations:\n{str(e)}")
       return
 
     # Close the widget (if used as dialog)

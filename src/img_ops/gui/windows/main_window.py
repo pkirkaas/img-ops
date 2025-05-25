@@ -11,7 +11,32 @@ from ..widgets.show_selected import ShowSelected
 from ..widgets.app_config_widget import AppConfigWidget
 from ..widgets.current_config_display import CurrentConfigDisplay
 from ..state import AppState
-from ...core.app_config import AppConfiguration, get_config_manager # Already relative, ensure it's correct
+from ...core.app_config import AppConfiguration, get_config_manager
+
+# Helper function for selectable QMessageBox
+def show_selectable_message_box(parent: QWidget, icon_type: QMessageBox.Icon, title: str, text: str, informative_text: str = "", detailed_text: str = ""):
+    """
+    Displays a QMessageBox with selectable text.
+
+    Args:
+        parent (QWidget): The parent widget.
+        icon_type (QMessageBox.Icon): The icon to display (e.g., QMessageBox.Critical).
+        title (str): The window title of the message box.
+        text (str): The main text of the message box.
+        informative_text (str, optional): Additional informative text.
+        detailed_text (str, optional): Detailed text for a details area.
+    """
+    msg_box = QMessageBox(parent)
+    msg_box.setIcon(icon_type)
+    msg_box.setWindowTitle(title)
+    msg_box.setText(text)
+    if informative_text:
+        msg_box.setInformativeText(informative_text)
+    if detailed_text:
+        msg_box.setDetailedText(detailed_text)
+    
+    msg_box.setTextInteractionFlags(Qt.TextSelectableByMouse | Qt.TextSelectableByKeyboard)
+    return msg_box.exec()
 
 class MainWindow(QMainWindow):
   """
@@ -194,7 +219,7 @@ class MainWindow(QMainWindow):
                 # Fallback to default if the selected one somehow isn't found
                 self.app_config = self.config_manager.get_default_configuration()
                 self.config_display.update_display(self.app_config)
-                QMessageBox.warning(self, "Configuration Error", f"Could not load configuration: {updated_config_name}. Reverted to default.")
+                show_selectable_message_box(self, QMessageBox.Warning, "Configuration Error", f"Could not load configuration: {updated_config_name}. Reverted to default.")
             else: # If no specific config was selected, refresh with current (possibly default)
                 self.app_config = self.config_manager.get_configuration(self.app_config.name) or self.config_manager.get_default_configuration()
                 self.config_display.update_display(self.app_config)
@@ -205,8 +230,9 @@ class MainWindow(QMainWindow):
             # For now, assuming the widget handles saving.
 
         except Exception as e:
-            QMessageBox.warning(
+            show_selectable_message_box(
                 self,
+                QMessageBox.Warning,
                 "Configuration Error",
                 f"Failed to update or apply configuration: {str(e)}"
             )

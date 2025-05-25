@@ -7,6 +7,7 @@
 - There will also be a src/cli subfolder containing all the CLI code/functionality.
 - There will also be a src/gui subfolder with all the GUI application & widget code.
 - All the GUI components should be as modular as possible, as configurable as possible, as reusable as possible.
+- All GUI modal error reporting displays should allow the error text to be selectable by the mouse & copyable to the clipboard
 - Project features/functionality will be built incrementally, one step at a time.
 - Prefer pip packages to implement functionality rather than re-inventing the wheel
 - Suggest useful pip packages if not already installed
