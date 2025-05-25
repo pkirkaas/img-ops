@@ -11,7 +11,7 @@ from ..widgets.show_selected import ShowSelected
 from ..widgets.app_config_widget import AppConfigWidget
 from ..widgets.current_config_display import CurrentConfigDisplay
 from ..state import AppState
-from ...core.app_config import AppConfiguration, get_config_manager
+from ...core.app_config import AppConfiguration, get_config_manager # Already relative, ensure it's correct
 
 class MainWindow(QMainWindow):
   """

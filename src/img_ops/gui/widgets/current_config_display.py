@@ -1,7 +1,7 @@
 from PySide6.QtWidgets import (QWidget, QVBoxLayout, QLabel, QGroupBox,
                              QFormLayout, QLineEdit, QTextEdit)
 from PySide6.QtCore import Qt
-from src.img_ops.core.app_config import AppConfiguration
+from ...core.app_config import AppConfiguration
 
 class CurrentConfigDisplay(QWidget):
     """

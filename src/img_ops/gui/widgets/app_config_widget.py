@@ -34,8 +34,8 @@ from PySide6.QtWidgets import (
 from PySide6.QtCore import Qt, Signal, Slot
 from PySide6.QtGui import QFont
 
-from src.img_ops.core.app_config import AppConfigManager, AppConfiguration
-from src.img_ops.core.exceptions import ConfigError
+from ...core.app_config import AppConfigManager, AppConfiguration
+from ...core.exceptions import ConfigError
 
 
 class ConfigEditDialog(QDialog):
@@ -339,27 +339,27 @@ class ConfigEditDialog(QDialog):
       self.name_edit.setFocus()
       return
     
-    # Update configuration
+    # Gather data and attempt to create/validate a new AppConfiguration instance
     try:
-      self.config.name = name
-      self.config.description = self.description_edit.toPlainText().strip()
-      self.config.method = self.method_combo.currentText()
-      self.config.percent = self.percent_spin.value()
+      current_values = {
+          "name": name,
+          "description": self.description_edit.toPlainText().strip(),
+          "method": self.method_combo.currentText(),
+          "percent": self.percent_spin.value(),
+          "paths": [self.paths_list.item(i).text() for i in range(self.paths_list.count())]
+      }
       
-      # Update paths
-      paths = []
-      for i in range(self.paths_list.count()):
-        paths.append(self.paths_list.item(i).text())
-      self.config.paths = paths
+      # Create a new, validated instance. This will raise Pydantic validation errors if any.
+      validated_config = AppConfiguration(**current_values)
       
-      # Validate the configuration (this will trigger Pydantic validation)
-      AppConfiguration(**self.config.dict())
+      # Update self.config to this new, validated instance
+      self.config = validated_config
       
-    except Exception as e:
+    except Exception as e: # Catches Pydantic validation errors and other potential issues
       QMessageBox.critical(self, "Validation Error", f"Configuration validation failed:\n{str(e)}")
-      return
+      return # Do not accept the dialog if validation fails
     
-    self.accept()
+    self.accept() # Accept the dialog only if validation and assignment were successful
   
   def get_configuration(self) -> AppConfiguration:
     """
