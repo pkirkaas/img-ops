@@ -6,7 +6,8 @@ from PySide6.QtWidgets import (QMainWindow, QLabel, QVBoxLayout, QWidget, QDialo
 from PySide6.QtCore import Qt, Slot # Added Slot
 from ..widgets.resize_container import ResizeContainer
 # from ..widgets.tree_select import TreeSelect # Removed
-from ..widgets.image_viewer import ImageViewer
+# from ..widgets.image_viewer import ImageViewer # To be replaced
+from ..widgets.settings_config_widget import SettingsConfigWidget # New widget
 # from ..widgets.show_selected import ShowSelected # Removed
 from ..widgets.app_config_widget import AppConfigWidget
 from ..widgets.current_config_display import CurrentConfigDisplay
@@ -38,7 +39,7 @@ class MainWindow(QMainWindow):
     super().__init__(parent)
 
     self.setWindowTitle("Img-Ops - Image Operations")
-    self.setGeometry(100, 100, 900, 400) # x, y, width, height
+    self.setGeometry(100, 100, 1800, 800) # x, y, width, height (doubled size)
 
     # Initialize the application state
     self.app_state = AppState(self)
@@ -93,11 +94,12 @@ class MainWindow(QMainWindow):
     
     main_content_splitter = ResizeContainer(orientation=Qt.Orientation.Horizontal, background_color="lightcoral", parent=v_splitter_main)
 
-    # Create and add the ImageViewer to the left pane
-    self.image_viewer_main = ImageViewer(parent=main_content_splitter)
-    image_path = r"Z:\Photos\FavG\465826_6adaadb6_crop.jpg" # Example path
-    self.image_viewer_main.set_image_from_path(image_path)
-    main_content_splitter.addWidget(self.image_viewer_main)
+    # Create and add the SettingsConfigWidget to the left pane
+    self.settings_config_widget_main = SettingsConfigWidget(
+        config_manager=self.config_manager,
+        parent=main_content_splitter
+    )
+    main_content_splitter.addWidget(self.settings_config_widget_main)
 
     # Create and add the SelectedPathsWidget to the right pane
     self.selected_paths_widget_main = SelectedPathsWidget(parent=main_content_splitter)
@@ -124,15 +126,18 @@ class MainWindow(QMainWindow):
     self._connect_signals()
     
     # Initial load of paths from the default/active config into SelectedPathsWidget (via AppState)
-    self._load_paths_from_current_config()
+    # and load config into SettingsConfigWidget
+    self._load_config_into_widgets()
   
-  def _load_paths_from_current_config(self):
+  def _load_config_into_widgets(self):
     """
-    Updates AppState (and thus SelectedPathsWidget) with paths from the current self.app_config.
+    Updates AppState (SelectedPathsWidget) and SettingsConfigWidget
+    with data from the current self.app_config.
     """
     if self.app_config:
         self.app_state.set_selected_paths(set(self.app_config.paths))
-        # print(f"Loaded paths from '{self.app_config.name}' into SelectedPathsWidget: {self.app_config.paths}")
+        self.settings_config_widget_main.load_configuration(self.app_config)
+        # print(f"Loaded config '{self.app_config.name}' into widgets.")
     else:
         self.app_state.clear_selected_paths() # Clear if no config active
         # print("No active config, cleared paths in SelectedPathsWidget.")
@@ -147,22 +152,25 @@ class MainWindow(QMainWindow):
     
     # Connect the toolbar config selector widget
     self.select_config_widget_toolbar.configuration_selected.connect(self._on_toolbar_config_selected)
+
+    # Connect the SettingsConfigWidget's update signal
+    self.settings_config_widget_main.configuration_updated.connect(self._on_settings_config_updated)
   
   @Slot(str)
   def _on_toolbar_config_selected(self, config_name: str):
     """
     Handles configuration selection from the toolbar widget.
-    Updates the main application's active configuration and loads its paths.
+    Updates the main application's active configuration and loads its paths and details.
     """
     new_config = self.config_manager.get_configuration(config_name)
     if new_config:
-        if self.app_config is None or self.app_config.name != new_config.name:
-            self.app_config = new_config
+        if self.app_config is None or self.app_config.name != new_config.name: # Check if it's actually a change
+            self.app_config = new_config # MainWindow holds the single source of truth for active config
             config_file_path_str = self.config_manager.config_file_path if self.config_manager.config_file_path else None
             self.config_display.update_display(self.app_config, config_file_path_str)
             self.statusBar().showMessage(f"Configuration '{self.app_config.name}' activated.", 3000)
             
-            self._load_paths_from_current_config() # Load paths for the new config
+            self._load_config_into_widgets() # Load data into SettingsConfigWidget and paths into SelectedPathsWidget
             print(f"MainWindow: Active configuration changed to '{self.app_config.name}' via toolbar.")
     else:
         show_selectable_message_box(
@@ -218,47 +226,65 @@ class MainWindow(QMainWindow):
   # _on_selection_changed was removed as its functionality is now handled by
   # _on_app_state_paths_changed calling _update_status_bar_path_count.
 
+  @Slot(AppConfiguration)
+  def _on_settings_config_updated(self, updated_config: AppConfiguration):
+      """
+      Handles updates from the SettingsConfigWidget.
+      The self.app_config object instance should already be updated by SettingsConfigWidget.
+      This slot is mainly to refresh other UI parts if necessary.
+      """
+      # self.app_config is the same instance that SettingsConfigWidget modified.
+      # We just need to refresh displays that depend on it.
+      config_file_path_str = self.config_manager.config_file_path if self.config_manager.config_file_path else None
+      self.config_display.update_display(self.app_config, config_file_path_str)
+      # The toolbar selector (SelectConfigurationWidget) might need refreshing if the name could change,
+      # but name is read-only in SettingsConfigWidget. If other details shown in the
+      # selector were to change, it would need a refresh.
+      # self.select_config_widget_toolbar.refresh_configurations(select_config_name=self.app_config.name)
+      self.statusBar().showMessage(f"Configuration '{self.app_config.name}' updated.", 3000)
+      print(f"MainWindow: Configuration '{self.app_config.name}' updated via SettingsConfigWidget.")
+
   def _create_menus(self):
-    """
-    Creates the main menu bar and its actions.
-    """
-    menu_bar = self.menuBar()
+      """
+      Creates the main menu bar and its actions.
+      """
+      menu_bar = self.menuBar()
 
-    # File menu
-    file_menu = menu_bar.addMenu("&File")
-    open_action = file_menu.addAction("&Open...")
+      # File menu
+      file_menu = menu_bar.addMenu("&File")
+      open_action = file_menu.addAction("&Open...")
 
-    # Settings menu with configuration option
-    settings_menu = menu_bar.addMenu("&Settings")
-    config_action = settings_menu.addAction("&Configuration...")
-    config_action.triggered.connect(self._show_config_dialog)
-    # open_action.triggered.connect(self.open_file_dialog)
-    exit_action = file_menu.addAction("E&xit")
-    exit_action.triggered.connect(self.close)
+      # Settings menu with configuration option
+      settings_menu = menu_bar.addMenu("&Settings")
+      config_action = settings_menu.addAction("&Configuration...")
+      config_action.triggered.connect(self._show_config_dialog)
+      # open_action.triggered.connect(self.open_file_dialog)
+      exit_action = file_menu.addAction("E&xit")
+      exit_action.triggered.connect(self.close)
 
-    help_menu = menu_bar.addMenu("&Help")
-    about_action = help_menu.addAction("&About")
-    # about_action.triggered.connect(self.show_about_dialog)
+      help_menu = menu_bar.addMenu("&Help")
+      about_action = help_menu.addAction("&About")
+      # about_action.triggered.connect(self.show_about_dialog)
 
-    # Cache menu
-    cache_menu = menu_bar.addMenu("&Cache")
-    clear_cache_action = cache_menu.addAction("&Clear Cache")
-    clear_cache_action.triggered.connect(self._clear_file_cache)
-    clean_cache_action = cache_menu.addAction("C&lean Cache")
-    clean_cache_action.triggered.connect(self._clean_file_cache)
-    cache_status_action = cache_menu.addAction("Cache &Status...")
-    cache_status_action.triggered.connect(self._show_cache_status_dialog)
+      # Cache menu
+      cache_menu = menu_bar.addMenu("&Cache")
+      clear_cache_action = cache_menu.addAction("&Clear Cache")
+      clear_cache_action.triggered.connect(self._clear_file_cache)
+      clean_cache_action = cache_menu.addAction("C&lean Cache")
+      clean_cache_action.triggered.connect(self._clean_file_cache)
+      cache_status_action = cache_menu.addAction("Cache &Status...")
+      cache_status_action.triggered.connect(self._show_cache_status_dialog)
 
-    # Disable cache menu items if cache is not available
-    if not self.file_info_cache:
-        cache_menu.setEnabled(False)
+      # Disable cache menu items if cache is not available
+      if not self.file_info_cache:
+          cache_menu.setEnabled(False)
 
 
   def _create_status_bar(self):
-    """
-    Creates the status bar.
-    """
-    self.statusBar().showMessage("Ready")
+      """
+      Creates the status bar.
+      """
+      self.statusBar().showMessage("Ready")
 
   # Placeholder methods for actions (to be implemented)
   # def open_file_dialog(self):
@@ -268,149 +294,149 @@ class MainWindow(QMainWindow):
   #   print("Placeholder: Show about dialog triggered.")
 
   def _show_config_dialog(self):
-    """
-    Shows the configuration dialog and handles the result.
+      """
+      Shows the configuration dialog and handles the result.
 
-    Creates an AppConfigWidget dialog, shows it modally, and if accepted,
-    updates the current configuration and refreshes the display.
-    """
-    # Create a QDialog to host the AppConfigWidget
-    config_dialog = QDialog(self)
-    config_dialog.setWindowTitle("Application Configuration")
-    config_dialog.setMinimumSize(700, 500) # Adjust size as needed
+      Creates an AppConfigWidget dialog, shows it modally, and if accepted,
+      updates the current configuration and refreshes the display.
+      """
+      # Create a QDialog to host the AppConfigWidget
+      config_dialog = QDialog(self)
+      config_dialog.setWindowTitle("Application Configuration")
+      config_dialog.setMinimumSize(700, 500) # Adjust size as needed
 
-    # Create the AppConfigWidget instance
-    # Pass config_dialog as parent so AppConfigWidget can call accept/reject on it
-    app_config_widget = AppConfigWidget(config_manager=self.config_manager,
-                                        current_config_name=self.app_config.name,
-                                        parent=config_dialog)
+      # Create the AppConfigWidget instance
+      # Pass config_dialog as parent so AppConfigWidget can call accept/reject on it
+      app_config_widget = AppConfigWidget(config_manager=self.config_manager,
+                                          current_config_name=self.app_config.name,
+                                          parent=config_dialog)
 
-    # Set up layout for the QDialog
-    dialog_layout = QVBoxLayout(config_dialog)
-    dialog_layout.addWidget(app_config_widget)
-    config_dialog.setLayout(dialog_layout)
+      # Set up layout for the QDialog
+      dialog_layout = QVBoxLayout(config_dialog)
+      dialog_layout.addWidget(app_config_widget)
+      config_dialog.setLayout(dialog_layout)
 
-    # Connect the AppConfigWidget's signal to refresh the toolbar's selector
-    # This ensures if a config is added/deleted/renamed in the dialog, the toolbar updates.
-    app_config_widget.configuration_changed.connect(
-        lambda changed_config_name: self.select_config_widget_toolbar.refresh_configurations(
-            select_config_name=self.app_config.name # Try to keep current selection if possible
-        )
-    )
-    
-    # Show the dialog modally
-    if config_dialog.exec() == QDialog.DialogCode.Accepted:
-        try:
-            # The AppConfigWidget handles saving via its OK button.
-            # We retrieve the name of the configuration that was selected or active
-            # when the dialog was accepted.
-            updated_config_name = app_config_widget.get_selected_config_name()
-            if updated_config_name:
-              self.app_config = self.config_manager.get_configuration(updated_config_name)
-              if self.app_config:
-                config_file_path_str = self.config_manager.config_file_path if self.config_manager.config_file_path else None
-                self.config_display.update_display(self.app_config, config_file_path_str)
-                self.statusBar().showMessage(f"Configuration '{self.app_config.name}' loaded.", 3000)
-                # Update the toolbar selector and load paths
-                self.select_config_widget_toolbar.refresh_configurations(select_config_name=self.app_config.name)
-                self._load_paths_from_current_config()
-              else:
-                # Fallback to default if the selected one somehow isn't found
-                self.app_config = self.config_manager.get_default_configuration()
-                config_file_path_str = self.config_manager.config_file_path if self.config_manager.config_file_path else None
-                self.config_display.update_display(self.app_config, config_file_path_str)
-                self.select_config_widget_toolbar.refresh_configurations(select_config_name=self.app_config.name)
-                self._load_paths_from_current_config()
-                show_selectable_message_box(self, QMessageBox.Icon.Warning, "Configuration Error", f"Could not load configuration: {updated_config_name}. Reverted to default.")
-            else: # If no specific config was selected, refresh with current (possibly default)
-                self.app_config = self.config_manager.get_configuration(self.app_config.name) or self.config_manager.get_default_configuration()
-                config_file_path_str = self.config_manager.config_file_path if self.config_manager.config_file_path else None
-                self.config_display.update_display(self.app_config, config_file_path_str)
-                self.select_config_widget_toolbar.refresh_configurations(select_config_name=self.app_config.name)
-                self._load_paths_from_current_config()
+      # Connect the AppConfigWidget's signal to refresh the toolbar's selector
+      # This ensures if a config is added/deleted/renamed in the dialog, the toolbar updates.
+      app_config_widget.configuration_changed.connect(
+          lambda changed_config_name: self.select_config_widget_toolbar.refresh_configurations(
+              select_config_name=self.app_config.name # Try to keep current selection if possible
+          )
+      )
+      
+      # Show the dialog modally
+      if config_dialog.exec() == QDialog.DialogCode.Accepted:
+          try:
+              # The AppConfigWidget handles saving via its OK button.
+              # We retrieve the name of the configuration that was selected or active
+              # when the dialog was accepted.
+              updated_config_name = app_config_widget.get_selected_config_name()
+              if updated_config_name:
+                self.app_config = self.config_manager.get_configuration(updated_config_name)
+                if self.app_config:
+                  config_file_path_str = self.config_manager.config_file_path if self.config_manager.config_file_path else None
+                  self.config_display.update_display(self.app_config, config_file_path_str)
+                  self.statusBar().showMessage(f"Configuration '{self.app_config.name}' loaded.", 3000)
+                  # Update the toolbar selector and load data into widgets
+                  self.select_config_widget_toolbar.refresh_configurations(select_config_name=self.app_config.name)
+                  self._load_config_into_widgets()
+                else:
+                  # Fallback to default if the selected one somehow isn't found
+                  self.app_config = self.config_manager.get_default_configuration()
+                  config_file_path_str = self.config_manager.config_file_path if self.config_manager.config_file_path else None
+                  self.config_display.update_display(self.app_config, config_file_path_str)
+                  self.select_config_widget_toolbar.refresh_configurations(select_config_name=self.app_config.name)
+                  self._load_config_into_widgets()
+                  show_selectable_message_box(self, QMessageBox.Icon.Warning, "Configuration Error", f"Could not load configuration: {updated_config_name}. Reverted to default.")
+              else: # If no specific config was selected, refresh with current (possibly default)
+                  self.app_config = self.config_manager.get_configuration(self.app_config.name) or self.config_manager.get_default_configuration()
+                  config_file_path_str = self.config_manager.config_file_path if self.config_manager.config_file_path else None
+                  self.config_display.update_display(self.app_config, config_file_path_str)
+                  self.select_config_widget_toolbar.refresh_configurations(select_config_name=self.app_config.name)
+                  self._load_config_into_widgets()
 
-            # The AppConfigWidget should call self.config_manager.save_to_file() internally upon acceptance.
-            # If not, we might need to call it here:
-            # self.config_manager.save_to_file()
-            # For now, assuming the widget handles saving.
+              # The AppConfigWidget should call self.config_manager.save_to_file() internally upon acceptance.
+              # If not, we might need to call it here:
+              # self.config_manager.save_to_file()
+              # For now, assuming the widget handles saving.
 
-        except Exception as e:
-            show_selectable_message_box(
-                self,
-                QMessageBox.Warning,
-                "Configuration Error",
-                f"Failed to update or apply configuration: {str(e)}"
-            )
+          except Exception as e:
+              show_selectable_message_box(
+                  self,
+                  QMessageBox.Warning,
+                  "Configuration Error",
+                  f"Failed to update or apply configuration: {str(e)}"
+              )
 
   def _clear_file_cache(self):
-    """
-    Handles the 'Clear Cache' menu action.
-    Confirms with the user and then clears the file info cache.
-    """
-    if not self.file_info_cache:
-      show_selectable_message_box(self, QMessageBox.Icon.Warning, "Cache Not Available", "File info cache is not initialized.")
-      return
+      """
+      Handles the 'Clear Cache' menu action.
+      Confirms with the user and then clears the file info cache.
+      """
+      if not self.file_info_cache:
+        show_selectable_message_box(self, QMessageBox.Icon.Warning, "Cache Not Available", "File info cache is not initialized.")
+        return
 
-    reply = QMessageBox.question(
-        self,
-        "Confirm Clear Cache",
-        "Are you sure you want to permanently delete all entries from the phash cache?\n"
-        "This action cannot be undone.",
-        QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
-        QMessageBox.StandardButton.No
-    )
-    if reply == QMessageBox.StandardButton.Yes:
-      try:
-        self.file_info_cache.clear_cache()
-        self.statusBar().showMessage("File info cache cleared.", 3000)
-        show_selectable_message_box(self, QMessageBox.Icon.Information, "Cache Cleared", "All entries have been removed from the cache.")
-      except Exception as e:
-        show_selectable_message_box(self, QMessageBox.Icon.Critical, "Error Clearing Cache", f"Could not clear the cache: {e}")
+      reply = QMessageBox.question(
+          self,
+          "Confirm Clear Cache",
+          "Are you sure you want to permanently delete all entries from the phash cache?\n"
+          "This action cannot be undone.",
+          QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+          QMessageBox.StandardButton.No
+      )
+      if reply == QMessageBox.StandardButton.Yes:
+        try:
+          self.file_info_cache.clear_cache()
+          self.statusBar().showMessage("File info cache cleared.", 3000)
+          show_selectable_message_box(self, QMessageBox.Icon.Information, "Cache Cleared", "All entries have been removed from the cache.")
+        except Exception as e:
+          show_selectable_message_box(self, QMessageBox.Icon.Critical, "Error Clearing Cache", f"Could not clear the cache: {e}")
 
   def _clean_file_cache(self):
-    """
-    Handles the 'Clean Cache' menu action.
-    Runs the clean_cache method of the FileInfoCache.
-    """
-    if not self.file_info_cache:
-      show_selectable_message_box(self, QMessageBox.Icon.Warning, "Cache Not Available", "File info cache is not initialized.")
-      return
-    try:
-      self.file_info_cache.clean_cache()
-      self.statusBar().showMessage("File info cache cleaned.", 3000)
-      show_selectable_message_box(self, QMessageBox.Icon.Information, "Cache Cleaned", "Invalid or outdated entries have been removed from the cache.")
-    except Exception as e:
-      show_selectable_message_box(self, QMessageBox.Icon.Critical, "Error Cleaning Cache", f"Could not clean the cache: {e}")
+      """
+      Handles the 'Clean Cache' menu action.
+      Runs the clean_cache method of the FileInfoCache.
+      """
+      if not self.file_info_cache:
+        show_selectable_message_box(self, QMessageBox.Icon.Warning, "Cache Not Available", "File info cache is not initialized.")
+        return
+      try:
+        self.file_info_cache.clean_cache()
+        self.statusBar().showMessage("File info cache cleaned.", 3000)
+        show_selectable_message_box(self, QMessageBox.Icon.Information, "Cache Cleaned", "Invalid or outdated entries have been removed from the cache.")
+      except Exception as e:
+        show_selectable_message_box(self, QMessageBox.Icon.Critical, "Error Cleaning Cache", f"Could not clean the cache: {e}")
 
   def _show_cache_status_dialog(self):
-    """
-    Handles the 'Cache Status' menu action.
-    Displays a dialog with cache statistics.
-    """
-    if not self.file_info_cache:
-      show_selectable_message_box(self, QMessageBox.Icon.Warning, "Cache Not Available", "File info cache is not initialized. Cannot show status.")
-      return
+      """
+      Handles the 'Cache Status' menu action.
+      Displays a dialog with cache statistics.
+      """
+      if not self.file_info_cache:
+        show_selectable_message_box(self, QMessageBox.Icon.Warning, "Cache Not Available", "File info cache is not initialized. Cannot show status.")
+        return
 
-    dialog = CacheStatusDialog(cache_instance=self.file_info_cache, parent=self)
-    dialog.exec()
-  
+      dialog = CacheStatusDialog(cache_instance=self.file_info_cache, parent=self)
+      dialog.exec()
+    
   def closeEvent(self, event):
-    """
-    Ensure the cache connection is closed when the main window closes.
-    """
-    if self.file_info_cache:
-        try:
-            self.file_info_cache.close()
-        except Exception as e:
-            print(f"Error closing file info cache: {e}") # Log this
-    super().closeEvent(event)
+      """
+      Ensure the cache connection is closed when the main window closes.
+      """
+      if self.file_info_cache:
+          try:
+              self.file_info_cache.close()
+          except Exception as e:
+              print(f"Error closing file info cache: {e}") # Log this
+      super().closeEvent(event)
 
 
 if __name__ == '__main__':
-  # This part is for testing the MainWindow independently
-  import sys
-  from PySide6.QtWidgets import QApplication
-  app = QApplication(sys.argv)
-  main_win = MainWindow()
-  main_win.show()
-  sys.exit(app.exec())
+    # This part is for testing the MainWindow independently
+    import sys
+    from PySide6.QtWidgets import QApplication
+    app = QApplication(sys.argv)
+    main_win = MainWindow()
+    main_win.show()
+    sys.exit(app.exec())

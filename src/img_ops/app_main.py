@@ -14,6 +14,7 @@ def main():
   """
   Parses arguments and launches the appropriate application mode (CLI or GUI).
   """
+  print("\n\n\n\n\n") # Add 5 newlines before starting
   parser = argparse.ArgumentParser(
     description="Img-Ops: Image Operations Tool. Run with --gui for the graphical interface."
   )

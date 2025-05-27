@@ -11,6 +11,7 @@ def run_gui():
   """
   Initializes and runs the GUI application.
   """
+  print("\n\n\n\n\n") # Add 5 newlines before starting
   app = QApplication(sys.argv)
 
   # Create and show the main window

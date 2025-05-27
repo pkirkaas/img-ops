@@ -4,6 +4,8 @@ Main entry point for the img-ops Command Line Interface (CLI).
 This script will initialize the CLI application (e.g., using Typer or Click)
 and register all available commands.
 """
+print("\n\n\n\n\n") # Add 5 newlines before starting
+
 import typer
 
 # Create a Typer application instance
