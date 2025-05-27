@@ -2,45 +2,22 @@
 Defines the MainWindow class for the img-ops application.
 """
 from PySide6.QtWidgets import (QMainWindow, QLabel, QVBoxLayout, QWidget, QDialog,
-                            QMessageBox)
-from PySide6.QtCore import Qt
+                            QMessageBox, QToolBar) # Added QToolBar
+from PySide6.QtCore import Qt, Slot # Added Slot
 from ..widgets.resize_container import ResizeContainer
-from ..widgets.tree_select import TreeSelect
+# from ..widgets.tree_select import TreeSelect # Removed
 from ..widgets.image_viewer import ImageViewer
-from ..widgets.show_selected import ShowSelected
+# from ..widgets.show_selected import ShowSelected # Removed
 from ..widgets.app_config_widget import AppConfigWidget
 from ..widgets.current_config_display import CurrentConfigDisplay
 from ..widgets.selected_paths_widget import SelectedPathsWidget # New import
+from ..widgets.select_configuration_widget import SelectConfigurationWidget # Import new widget
 from ..state import AppState
 from ...core.app_config import AppConfiguration, get_config_manager
 from ...core.file_info_cache import FileInfoCache
 from ..dialogs.cache_status_dialog import CacheStatusDialog
+from ..utils import show_selectable_message_box # Import the centralized helper
 
-
-# Helper function for selectable QMessageBox
-def show_selectable_message_box(parent: QWidget, icon_type: QMessageBox.Icon, title: str, text: str, informative_text: str = "", detailed_text: str = ""):
-    """
-    Displays a QMessageBox with selectable text.
-
-    Args:
-        parent (QWidget): The parent widget.
-        icon_type (QMessageBox.Icon): The icon to display (e.g., QMessageBox.Critical).
-        title (str): The window title of the message box.
-        text (str): The main text of the message box.
-        informative_text (str, optional): Additional informative text.
-        detailed_text (str, optional): Detailed text for a details area.
-    """
-    msg_box = QMessageBox(parent)
-    msg_box.setIcon(icon_type)
-    msg_box.setWindowTitle(title)
-    msg_box.setText(text)
-    if informative_text:
-        msg_box.setInformativeText(informative_text)
-    if detailed_text:
-        msg_box.setDetailedText(detailed_text)
-    
-    msg_box.setTextInteractionFlags(Qt.TextSelectableByMouse | Qt.TextSelectableByKeyboard)
-    return msg_box.exec()
 
 class MainWindow(QMainWindow):
   """
@@ -68,7 +45,8 @@ class MainWindow(QMainWindow):
 
     # Initialize configuration management
     self.config_manager = get_config_manager()
-    self.app_config = self.config_manager.get_default_configuration()
+    self.app_config = self.config_manager.get_default_configuration() # Initial active config
+    self.app_state.set_selected_paths(set(self.app_config.paths)) # Initialize AppState
 
     # Initialize FileInfoCache
     # In a real application, you might want to manage the lifecycle of this cache
@@ -94,60 +72,49 @@ class MainWindow(QMainWindow):
         print("MainWindow: FileInfoCache was not initialized, so not setting it on AppState.")
 
 
+    # --- Toolbar Setup ---
+    self.toolbar = QToolBar("Main Toolbar")
+    self.toolbar.setMovable(False) # Optional: prevent toolbar from being moved
+    self.addToolBar(self.toolbar)
+
+    self.select_config_widget_toolbar = SelectConfigurationWidget(
+        config_manager=self.config_manager,
+        app_state=self.app_state, # Pass app_state
+        parent=self # Parent to the main window for lifecycle management
+    )
+    self.toolbar.addWidget(self.select_config_widget_toolbar)
+
     # --- Central widget setup with ResizeContainers ---
     v_splitter_main = ResizeContainer(orientation=Qt.Orientation.Vertical, parent=self)
     self.setCentralWidget(v_splitter_main)
 
-    # Top horizontal container
-    h_splitter_top = ResizeContainer(orientation=Qt.Orientation.Horizontal, background_color="lightblue", parent=v_splitter_main)
+    # The v_splitter_main will now hold the main content area directly.
+    # We'll create a horizontal splitter for the ImageViewer and SelectedPathsWidget.
     
-    # Create and add the TreeSelect widget to the top-left pane
-    # It will default to showing the system root ("This PC" / "/")
-    self.tree_select_widget = TreeSelect(parent=h_splitter_top)
-    self.tree_select_widget.set_app_state(self.app_state)
-    h_splitter_top.addWidget(self.tree_select_widget)
+    main_content_splitter = ResizeContainer(orientation=Qt.Orientation.Horizontal, background_color="lightcoral", parent=v_splitter_main)
+
+    # Create and add the ImageViewer to the left pane
+    self.image_viewer_main = ImageViewer(parent=main_content_splitter)
+    image_path = r"Z:\Photos\FavG\465826_6adaadb6_crop.jpg" # Example path
+    self.image_viewer_main.set_image_from_path(image_path)
+    main_content_splitter.addWidget(self.image_viewer_main)
+
+    # Create and add the SelectedPathsWidget to the right pane
+    self.selected_paths_widget_main = SelectedPathsWidget(parent=main_content_splitter)
+    self.selected_paths_widget_main.set_app_state(self.app_state)
+    main_content_splitter.addWidget(self.selected_paths_widget_main)
     
-    # Create and add the ShowSelected widget to the top-right pane
-    self.show_selected_widget = ShowSelected(parent=h_splitter_top)
-    self.show_selected_widget.set_app_state(self.app_state)
-    h_splitter_top.addWidget(self.show_selected_widget)
-    
-    h_splitter_top.setWidgetSizes([150, 150]) # Initial sizes for top horizontal panes
+    main_content_splitter.setWidgetSizes([300, 200]) # Adjust initial sizes as needed
 
-    # Bottom horizontal container
-    h_splitter_bottom = ResizeContainer(orientation=Qt.Orientation.Horizontal, background_color="lightcoral", parent=v_splitter_main)
-
-    # Create and add the ImageViewer to the bottom-left pane
-    self.image_viewer_bl = ImageViewer(parent=h_splitter_bottom)
-    # It's good practice to ensure the path separator is correct for the OS,
-    # though Python's open and QPixmap are often flexible.
-    # For Windows paths given with backslashes in strings, they might need escaping
-    # or use raw strings r"Z:\..." or forward slashes "Z:/...".
-    # QPixmap should handle "Z:\Photos\FavG\465826_6adaadb6_crop.jpg" correctly on Windows.
-    image_path = r"Z:\Photos\FavG\465826_6adaadb6_crop.jpg"
-    self.image_viewer_bl.set_image_from_path(image_path)
-    h_splitter_bottom.addWidget(self.image_viewer_bl)
-
-    # Create and add the SelectedPathsWidget to the bottom-right pane
-    self.selected_paths_widget_br = SelectedPathsWidget(parent=h_splitter_bottom)
-    self.selected_paths_widget_br.set_app_state(self.app_state) # Connect to app state
-    h_splitter_bottom.addWidget(self.selected_paths_widget_br)
-    # label_br = QLabel("Bottom-Right Pane", h_splitter_bottom) # Original placeholder
-    # label_br.setAlignment(Qt.AlignmentFlag.AlignCenter)
-    # label_br.setStyleSheet("background-color: #fce4ec; border: 1px solid #f8bbd0; padding: 5px;")
-    # h_splitter_bottom.addWidget(label_br)
-
-
-    h_splitter_bottom.setWidgetSizes([150, 150]) # Initial sizes for bottom horizontal panes
-
-    # Add horizontal splitters to the main vertical splitter
-    v_splitter_main.addWidget(h_splitter_top)
-    v_splitter_main.addWidget(h_splitter_bottom)
-    v_splitter_main.setWidgetSizes([200, 200]) # Initial sizes for vertical split
+    v_splitter_main.addWidget(main_content_splitter) # Add the main content area
+    # v_splitter_main will only have one child now, so setWidgetSizes might not be strictly needed
+    # or should be adjusted if more direct children are added to v_splitter_main later.
+    # For now, let the ResizeContainer manage its single child's size.
 
     # Add configuration display widget to the status bar area
     self.config_display = CurrentConfigDisplay(parent=self)
-    self.config_display.update_display(self.app_config) # Populate the display
+    config_file_path_str = self.config_manager.config_file_path if self.config_manager.config_file_path else None
+    self.config_display.update_display(self.app_config, config_file_path_str) # Populate the display
     self.statusBar().addPermanentWidget(self.config_display, stretch=1)
 
     self._create_menus()
@@ -155,28 +122,101 @@ class MainWindow(QMainWindow):
     
     # Connect additional signals for enhanced functionality
     self._connect_signals()
+    
+    # Initial load of paths from the default/active config into SelectedPathsWidget (via AppState)
+    self._load_paths_from_current_config()
   
+  def _load_paths_from_current_config(self):
+    """
+    Updates AppState (and thus SelectedPathsWidget) with paths from the current self.app_config.
+    """
+    if self.app_config:
+        self.app_state.set_selected_paths(set(self.app_config.paths))
+        # print(f"Loaded paths from '{self.app_config.name}' into SelectedPathsWidget: {self.app_config.paths}")
+    else:
+        self.app_state.clear_selected_paths() # Clear if no config active
+        # print("No active config, cleared paths in SelectedPathsWidget.")
+
   def _connect_signals(self):
     """
     Connect additional signals between widgets and state for enhanced functionality.
     """
-    # Connect tree selection changes to update status bar
-    self.app_state.selected_paths_changed.connect(self._on_selection_changed)
-  
-  def _on_selection_changed(self, selected_paths):
-    """
-    Handle changes to the selected paths by updating the status bar.
+    # When AppState's selected paths change (e.g., from SelectedPathsWidget),
+    # update the current app_config and save it.
+    self.app_state.selected_paths_changed.connect(self._on_app_state_paths_changed)
     
-    Args:
-      selected_paths (Set[str]): The new set of selected file paths.
+    # Connect the toolbar config selector widget
+    self.select_config_widget_toolbar.configuration_selected.connect(self._on_toolbar_config_selected)
+  
+  @Slot(str)
+  def _on_toolbar_config_selected(self, config_name: str):
     """
-    count = len(selected_paths)
-    if count == 0:
-      self.statusBar().showMessage("Ready")
-    elif count == 1:
-      self.statusBar().showMessage(f"1 file selected")
+    Handles configuration selection from the toolbar widget.
+    Updates the main application's active configuration and loads its paths.
+    """
+    new_config = self.config_manager.get_configuration(config_name)
+    if new_config:
+        if self.app_config is None or self.app_config.name != new_config.name:
+            self.app_config = new_config
+            config_file_path_str = self.config_manager.config_file_path if self.config_manager.config_file_path else None
+            self.config_display.update_display(self.app_config, config_file_path_str)
+            self.statusBar().showMessage(f"Configuration '{self.app_config.name}' activated.", 3000)
+            
+            self._load_paths_from_current_config() # Load paths for the new config
+            print(f"MainWindow: Active configuration changed to '{self.app_config.name}' via toolbar.")
     else:
-      self.statusBar().showMessage(f"{count} files selected")
+        show_selectable_message_box(
+            self,
+            QMessageBox.Icon.Warning,
+            "Configuration Error",
+            f"Could not load selected configuration: {config_name}"
+        )
+        # Optionally, revert the combobox in select_config_widget_toolbar to the previous valid config
+        if self.app_config:
+             self.select_config_widget_toolbar.set_selected_configuration(self.app_config.name)
+
+  @Slot(set)
+  def _on_app_state_paths_changed(self, new_paths_set: set):
+    """
+    Called when AppState.selected_paths changes (e.g., user modified in SelectedPathsWidget).
+    Updates the current self.app_config.paths and saves the configuration.
+    Also updates the status bar.
+    """
+    if self.app_config:
+        new_paths_list = sorted(list(new_paths_set))
+        if self.app_config.paths != new_paths_list: # Check if there's an actual change
+            self.app_config.paths = new_paths_list
+            try:
+                self.config_manager.save_to_file() # Save the updated configuration
+                # print(f"Saved updated paths for config '{self.app_config.name}' to file.")
+                # Update the status bar based on the new path count
+                self._update_status_bar_path_count(len(new_paths_list))
+
+            except ConfigError as e:
+                show_selectable_message_box(
+                    self,
+                    QMessageBox.Icon.Critical,
+                    "Save Error",
+                    f"Failed to save configuration changes for '{self.app_config.name}':\n{e}"
+                )
+        else: # Even if list content is same, count might be what status bar needs
+            self._update_status_bar_path_count(len(new_paths_list))
+
+    else: # No active config, just update status bar
+        self._update_status_bar_path_count(len(new_paths_set))
+
+
+  def _update_status_bar_path_count(self, count: int):
+    """Updates the status bar message based on the number of paths."""
+    if count == 0:
+      self.statusBar().showMessage("Ready - No paths selected")
+    elif count == 1:
+      self.statusBar().showMessage(f"1 path selected")
+    else:
+      self.statusBar().showMessage(f"{count} paths selected")
+
+  # _on_selection_changed was removed as its functionality is now handled by
+  # _on_app_state_paths_changed calling _update_status_bar_path_count.
 
   def _create_menus(self):
     """
@@ -249,6 +289,14 @@ class MainWindow(QMainWindow):
     dialog_layout = QVBoxLayout(config_dialog)
     dialog_layout.addWidget(app_config_widget)
     config_dialog.setLayout(dialog_layout)
+
+    # Connect the AppConfigWidget's signal to refresh the toolbar's selector
+    # This ensures if a config is added/deleted/renamed in the dialog, the toolbar updates.
+    app_config_widget.configuration_changed.connect(
+        lambda changed_config_name: self.select_config_widget_toolbar.refresh_configurations(
+            select_config_name=self.app_config.name # Try to keep current selection if possible
+        )
+    )
     
     # Show the dialog modally
     if config_dialog.exec() == QDialog.DialogCode.Accepted:
@@ -260,16 +308,26 @@ class MainWindow(QMainWindow):
             if updated_config_name:
               self.app_config = self.config_manager.get_configuration(updated_config_name)
               if self.app_config:
-                self.config_display.update_display(self.app_config)
+                config_file_path_str = self.config_manager.config_file_path if self.config_manager.config_file_path else None
+                self.config_display.update_display(self.app_config, config_file_path_str)
                 self.statusBar().showMessage(f"Configuration '{self.app_config.name}' loaded.", 3000)
+                # Update the toolbar selector and load paths
+                self.select_config_widget_toolbar.refresh_configurations(select_config_name=self.app_config.name)
+                self._load_paths_from_current_config()
               else:
                 # Fallback to default if the selected one somehow isn't found
                 self.app_config = self.config_manager.get_default_configuration()
-                self.config_display.update_display(self.app_config)
-                show_selectable_message_box(self, QMessageBox.Warning, "Configuration Error", f"Could not load configuration: {updated_config_name}. Reverted to default.")
+                config_file_path_str = self.config_manager.config_file_path if self.config_manager.config_file_path else None
+                self.config_display.update_display(self.app_config, config_file_path_str)
+                self.select_config_widget_toolbar.refresh_configurations(select_config_name=self.app_config.name)
+                self._load_paths_from_current_config()
+                show_selectable_message_box(self, QMessageBox.Icon.Warning, "Configuration Error", f"Could not load configuration: {updated_config_name}. Reverted to default.")
             else: # If no specific config was selected, refresh with current (possibly default)
                 self.app_config = self.config_manager.get_configuration(self.app_config.name) or self.config_manager.get_default_configuration()
-                self.config_display.update_display(self.app_config)
+                config_file_path_str = self.config_manager.config_file_path if self.config_manager.config_file_path else None
+                self.config_display.update_display(self.app_config, config_file_path_str)
+                self.select_config_widget_toolbar.refresh_configurations(select_config_name=self.app_config.name)
+                self._load_paths_from_current_config()
 
             # The AppConfigWidget should call self.config_manager.save_to_file() internally upon acceptance.
             # If not, we might need to call it here:

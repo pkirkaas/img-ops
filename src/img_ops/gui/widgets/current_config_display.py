@@ -1,6 +1,7 @@
 from PySide6.QtWidgets import (QWidget, QVBoxLayout, QLabel, QGroupBox,
                              QFormLayout, QLineEdit, QTextEdit)
 from PySide6.QtCore import Qt
+from typing import Optional # Added Optional import
 from ...core.app_config import AppConfiguration
 
 class CurrentConfigDisplay(QWidget):
@@ -85,23 +86,31 @@ class CurrentConfigDisplay(QWidget):
         self.percentage_label.setReadOnly(True)
         self.percentage_label.setStyleSheet("background-color: #f5f5f5; border: 1px solid #ddd; border-radius: 3px; padding: 2px;")
 
+        # Config file path
+        self.config_file_path_label = QLineEdit()
+        self.config_file_path_label.setReadOnly(True)
+        self.config_file_path_label.setStyleSheet("background-color: #f5f5f5; border: 1px solid #ddd; border-radius: 3px; padding: 2px; font-size: 9px;") # Smaller font for path
+ 
         # Add widgets to the form layout
         form_layout.addRow(QLabel("Name:"), self.name_label)
         form_layout.addRow(QLabel("Description:"), self.desc_label)
         form_layout.addRow(QLabel("Paths:"), self.paths_label)
         form_layout.addRow(QLabel("Similarity Method:"), self.method_label)
         form_layout.addRow(QLabel("Similarity Percentage:"), self.percentage_label)
+        form_layout.addRow(QLabel("Source File:"), self.config_file_path_label)
+
 
         # Add the group box to the main layout
         layout.addWidget(config_group)
         self.setLayout(layout)
 
-    def update_display(self, config: AppConfiguration):
+    def update_display(self, config: AppConfiguration, config_file_path: Optional[str] = None):
         """
         Update the display with the current configuration values.
 
         Args:
             config (AppConfiguration): The configuration object containing the current settings.
+            config_file_path (Optional[str]): The absolute path to the configuration YAML file.
         """
         if not config:
             self._clear_display()
@@ -116,6 +125,8 @@ class CurrentConfigDisplay(QWidget):
 
         self.method_label.setText(config.method if config.method else "Not set")
         self.percentage_label.setText(f"{config.percent}%" if config.percent is not None else "Not set")
+        self.config_file_path_label.setText(config_file_path if config_file_path else "N/A")
+
 
     def _clear_display(self):
         """Clear all fields in the display."""
@@ -124,3 +135,4 @@ class CurrentConfigDisplay(QWidget):
         self.paths_label.clear()
         self.method_label.clear()
         self.percentage_label.clear()
+        self.config_file_path_label.clear()

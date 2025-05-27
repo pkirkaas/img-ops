@@ -37,6 +37,8 @@ class CacheStatusDialog(QDialog):
     self.info_label = QLabel("Fetching cache status...")
     self.info_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
     self.info_label.setWordWrap(True)
+    # Make the info label selectable
+    self.info_label.setTextInteractionFlags(Qt.TextInteractionFlag.TextSelectableByMouse | Qt.TextInteractionFlag.TextSelectableByKeyboard)
     layout.addWidget(self.info_label)
 
     # Add a refresh button

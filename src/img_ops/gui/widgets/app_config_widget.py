@@ -29,38 +29,15 @@ from PySide6.QtWidgets import (
   QDialogButtonBox,
   QFileDialog,
   QSplitter,
-  QFrame
+  QFrame,
+  QMenu # Added for context menu
 )
-from PySide6.QtCore import Qt, Signal, Slot
-from PySide6.QtGui import QFont
+from PySide6.QtCore import Qt, Signal, Slot, QPoint # Added QPoint
+from PySide6.QtGui import QFont, QAction # Added QAction
 
 from ...core.app_config import AppConfigManager, AppConfiguration
 from ...core.exceptions import ConfigError
-
-# Helper function for selectable QMessageBox
-def show_selectable_message_box(parent: QWidget, icon_type: QMessageBox.Icon, title: str, text: str, informative_text: str = "", detailed_text: str = ""):
-    """
-    Displays a QMessageBox with selectable text.
-
-    Args:
-        parent (QWidget): The parent widget.
-        icon_type (QMessageBox.Icon): The icon to display (e.g., QMessageBox.Critical).
-        title (str): The window title of the message box.
-        text (str): The main text of the message box.
-        informative_text (str, optional): Additional informative text.
-        detailed_text (str, optional): Detailed text for a details area.
-    """
-    msg_box = QMessageBox(parent)
-    msg_box.setIcon(icon_type)
-    msg_box.setWindowTitle(title)
-    msg_box.setText(text)
-    if informative_text:
-        msg_box.setInformativeText(informative_text)
-    if detailed_text:
-        msg_box.setDetailedText(detailed_text)
-    
-    msg_box.setTextInteractionFlags(Qt.TextSelectableByMouse | Qt.TextSelectableByKeyboard)
-    return msg_box.exec()
+from ..utils import show_selectable_message_box # Import the centralized helper
 
 
 class ConfigEditDialog(QDialog):
@@ -467,7 +444,8 @@ class AppConfigWidget(QWidget):
 
     self.config_list = QListWidget()
     self.config_list.setMinimumWidth(200)
-    self.config_list.setToolTip("Select a configuration to view or edit")
+    self.config_list.setToolTip("Select a configuration to view or edit. Right-click for more options.")
+    self.config_list.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu) # Enable custom context menu
     left_layout.addWidget(self.config_list)
 
     # List management buttons
@@ -596,9 +574,10 @@ class AppConfigWidget(QWidget):
 
   def _connect_signals(self):
     """Connect widget signals to their handlers."""
-    # List selection
+    # List selection and context menu
     self.config_list.itemSelectionChanged.connect(self._on_config_selection_changed)
     self.config_list.itemDoubleClicked.connect(self._edit_configuration)
+    self.config_list.customContextMenuRequested.connect(self._show_config_list_context_menu)
 
     # Buttons
     self.new_btn.clicked.connect(self._create_new_configuration)
@@ -657,6 +636,10 @@ class AppConfigWidget(QWidget):
     details.append(f"Description: {config.description}")
     details.append(f"Method: {config.method}")
     details.append(f"Similarity: {config.percent}%")
+    
+    # Add config file path
+    if self.config_manager and self.config_manager.config_file_path:
+        details.append(f"Source File: {self.config_manager.config_file_path}") # Removed .resolve()
     details.append("")
 
     if config.paths:
@@ -768,51 +751,86 @@ class AppConfigWidget(QWidget):
         else:
           show_selectable_message_box(self, QMessageBox.Warning, "Error", f"Configuration '{config_name}' not found.")
       except ConfigError as e:
-        show_selectable_message_box(self, QMessageBox.Critical, "Configuration Error", f"Failed to delete configuration:\n{str(e)}")
+          show_selectable_message_box(self, QMessageBox.Critical, "Configuration Error", f"Failed to delete configuration:\n{str(e)}")
       except Exception as e:
-        show_selectable_message_box(self, QMessageBox.Critical, "Unexpected Error", f"An unexpected error occurred:\n{str(e)}")
+          show_selectable_message_box(self, QMessageBox.Critical, "Unexpected Error", f"An unexpected error occurred:\n{str(e)}")
+
+  @Slot()
+  def _copy_configuration(self):
+      """Copies the selected configuration."""
+      if not self.current_config:
+          return
+
+      original_name = self.current_config.name
+      new_name_base = f"{original_name} - Copy"
+      new_name = new_name_base
+      counter = 1
+      existing_names = self.config_manager.list_configuration_names()
+
+      # Ensure unique name for the copy
+      while new_name in existing_names:
+          new_name = f"{new_name_base} ({counter})"
+          counter += 1
+      
+      copied_config_data = self.current_config.dict()
+      copied_config_data['name'] = new_name
+      
+      try:
+          new_config = AppConfiguration(**copied_config_data)
+          if self.config_manager.add_configuration(new_config):
+              self.config_manager.save_to_file()
+              self._refresh_config_list()
+              self._select_config_by_name(new_config.name)
+              self.configuration_changed.emit(new_config.name)
+              show_selectable_message_box(self, QMessageBox.Information, "Configuration Copied", f"Configuration '{original_name}' copied to '{new_config.name}'.")
+          else:
+              show_selectable_message_box(self, QMessageBox.Warning, "Copy Error", f"Could not add copied configuration '{new_name}'. It might already exist.")
+      except ConfigError as e:
+          show_selectable_message_box(self, QMessageBox.Critical, "Copy Error", f"Failed to save copied configuration:\n{str(e)}")
+      except Exception as e:
+          show_selectable_message_box(self, QMessageBox.Critical, "Copy Error", f"An unexpected error occurred while copying:\n{str(e)}")
 
   def _select_config_by_name(self, name: str):
-    """
-    Select a configuration by name in the list.
+      """
+      Select a configuration by name in the list.
 
-    Args:
-      name (str): Name of the configuration to select.
-    """
-    for i in range(self.config_list.count()):
-      item = self.config_list.item(i)
-      if item.data(Qt.ItemDataRole.UserRole) == name:
-        self.config_list.setCurrentItem(item)
-        break
+      Args:
+          name (str): Name of the configuration to select.
+      """
+      for i in range(self.config_list.count()):
+          item = self.config_list.item(i)
+          if item.data(Qt.ItemDataRole.UserRole) == name:
+              self.config_list.setCurrentItem(item)
+              break
 
   @Slot()
   def _on_ok_clicked(self):
-    """Handle OK button click."""
-    # Save any pending changes
-    try:
-      self.config_manager.save_to_file()
-    except ConfigError as e:
-      show_selectable_message_box(self, QMessageBox.Critical, "Save Error", f"Failed to save configurations:\n{str(e)}")
-      return
-
-    # Close the widget (if used as dialog)
-    if self.parent() and hasattr(self.parent(), 'accept'):
-      self.parent().accept()
+      """Handle OK button click."""
+      # Save any pending changes
+      try:
+          self.config_manager.save_to_file()
+      except ConfigError as e:
+          show_selectable_message_box(self, QMessageBox.Critical, "Save Error", f"Failed to save configurations:\n{str(e)}")
+          return
+  
+      # Close the widget (if used as dialog)
+      if self.parent() and hasattr(self.parent(), 'accept'):
+          self.parent().accept()
 
   @Slot()
   def _on_cancel_clicked(self):
-    """Handle Cancel button click."""
-    # Reload configurations to discard any unsaved changes
-    try:
-      self.config_manager.load_from_file()
-      self._refresh_config_list()
-    except ConfigError as e:
-      # If reload fails, just close
-      pass
+      """Handle Cancel button click."""
+      # Reload configurations to discard any unsaved changes
+      try:
+          self.config_manager.load_from_file()
+          self._refresh_config_list()
+      except ConfigError as e:
+          # If reload fails, just close
+          pass
 
-    # Close the widget (if used as dialog)
-    if self.parent() and hasattr(self.parent(), 'reject'):
-      self.parent().reject()
+      # Close the widget (if used as dialog)
+      if self.parent() and hasattr(self.parent(), 'reject'):
+          self.parent().reject()
 
   def get_selected_configuration(self) -> Optional[AppConfiguration]:
     """
@@ -837,6 +855,33 @@ class AppConfigWidget(QWidget):
     if self.current_config:
       return self.current_config.name
     return None
+
+  @Slot(QPoint)
+  def _show_config_list_context_menu(self, pos: QPoint):
+    """Shows the context menu for the configuration list."""
+    context_menu = QMenu(self)
+    
+    new_action = context_menu.addAction("New Configuration...")
+    new_action.triggered.connect(self._create_new_configuration)
+    
+    context_menu.addSeparator()
+    
+    selected_item = self.config_list.currentItem()
+    
+    edit_action = context_menu.addAction("Edit Selected...")
+    edit_action.setEnabled(selected_item is not None)
+    edit_action.triggered.connect(self._edit_configuration)
+    
+    copy_action = context_menu.addAction("Copy Selected")
+    copy_action.setEnabled(selected_item is not None)
+    copy_action.triggered.connect(self._copy_configuration)
+
+    delete_action = context_menu.addAction("Delete Selected")
+    delete_action.setEnabled(selected_item is not None)
+    delete_action.triggered.connect(self._delete_configuration)
+    
+    context_menu.exec(self.config_list.mapToGlobal(pos))
+
 
   def set_selected_configuration(self, name: str) -> bool:
     """
