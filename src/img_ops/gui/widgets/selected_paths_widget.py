@@ -408,7 +408,7 @@ class SelectedPathsWidget(QWidget):
         file_path_str = str(file_path_obj)
         try:
             # This will compute and cache if necessary
-            cache.get_or_compute_phash(file_path_str)
+            cache.get_phash(file_path_str) # Corrected method name
             processed_count +=1
         except Exception as e:
             # Log error or collect errors to show later
