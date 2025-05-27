@@ -1,8 +1,7 @@
-# TODO: Before assigning task -
-Implement a phash - choose library, & similarity function
+# Task: A file information cache manager with SQLite
 
 
-Task: A file information cache manager with SQLite
+
 
 In src/core, implement a sqlite file information cache manager - `file_info_cache.py`.
 
