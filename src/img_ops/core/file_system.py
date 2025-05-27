@@ -285,3 +285,61 @@ def check_nested(paths: List[Union[str, Path]]) -> bool:
       #   raise ValueError(f"Nesting violation: Path '{p1}' is inside path '{p2}'.")
 
   return True
+
+def get_all_image_files_in_paths(
+    paths_to_scan: List[Union[str, Path]],
+    image_extensions_patterns: List[str]
+) -> List[Path]:
+    """
+    Scans a list of input paths (which can be files or directories) and returns
+    a list of all unique image files found.
+
+    For directories, it recursively searches for image files.
+    Image files are identified by the provided extension patterns.
+
+    Args:
+      paths_to_scan: A list of file system paths (strings or pathlib.Path objects)
+                     to scan.
+      image_extensions_patterns: A list of image file extension patterns (e.g., "*.jpg", "*.png").
+
+    Returns:
+      A list of pathlib.Path objects, each pointing to a unique image file found.
+      Returns an empty list if no image files are found or if inputs are empty.
+
+    Raises:
+      TypeError: If inputs are not of the expected types.
+      ValueError: If image_extensions_patterns contains invalid patterns.
+    """
+    if not isinstance(paths_to_scan, list):
+        raise TypeError("Input 'paths_to_scan' must be a list.")
+    if not isinstance(image_extensions_patterns, list):
+        raise TypeError("Input 'image_extensions_patterns' must be a list.")
+
+    if not paths_to_scan:
+        return []
+
+    # Convert patterns like "*.jpg" to ".jpg" for filter_imgs
+    custom_extensions_for_filter = []
+    for pattern in image_extensions_patterns:
+        if not isinstance(pattern, str) or not pattern.startswith("*.") or len(pattern) <= 2:
+            raise ValueError(f"Invalid image extension pattern: '{pattern}'. Must be like '*.ext'.")
+        custom_extensions_for_filter.append(pattern[1:]) # Get ".ext"
+
+    try:
+        # 1. Extract all file paths from the input list (handles directories recursively)
+        all_files_str = extract_paths(paths_to_scan)
+
+        # 2. Filter these files to get only images based on the provided extensions
+        #    filter_imgs expects extensions like ['.jpg'], not ['jpg'] or ['*.jpg']
+        #    It's case-insensitive by default.
+        image_files_str = filter_imgs(all_files_str, custom_extensions=custom_extensions_for_filter)
+        
+        # Convert to Path objects and ensure uniqueness (though extract_paths already does some sorting/uniquing)
+        unique_image_paths = sorted(list(set(Path(p) for p in image_files_str)))
+        return unique_image_paths
+
+    except Exception as e:
+        # Re-raise or handle more gracefully depending on desired behavior
+        # For now, print and re-raise to make debugging easier.
+        print(f"Error in get_all_image_files_in_paths: {e}")
+        raise

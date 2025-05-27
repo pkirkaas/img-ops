@@ -5,7 +5,9 @@ This module provides centralized state management using Qt's signal/slot mechani
 for communication between widgets and the main application.
 """
 from PySide6.QtCore import QObject, Signal
-from typing import Set, List
+from typing import Set, List, Optional # Added Optional
+
+from ..core.file_info_cache import FileInfoCache # Import for type hinting
 
 
 class AppState(QObject):
@@ -40,6 +42,7 @@ class AppState(QObject):
     # Internal state storage
     self._selected_paths: Set[str] = set()
     self._current_directory: str = ""
+    self.file_info_cache: Optional[FileInfoCache] = None # Added FileInfoCache attribute
   
   @property
   def selected_paths(self) -> Set[str]:
@@ -121,3 +124,16 @@ class AppState(QObject):
       List[str]: The selected file paths as a sorted list.
     """
     return sorted(list(self._selected_paths))
+
+  def set_file_info_cache(self, cache: FileInfoCache):
+    """
+    Sets the FileInfoCache instance for the application.
+
+    Args:
+      cache (FileInfoCache): The file information cache instance.
+    """
+    if self.file_info_cache is not cache: # Avoid unnecessary reassignment if it's the same object
+        self.file_info_cache = cache
+        # Optionally, emit a signal if other parts of the app need to know the cache is ready/changed.
+        # self.file_info_cache_changed.emit(self.file_info_cache)
+        print(f"AppState: FileInfoCache instance set: {cache}") # For debugging

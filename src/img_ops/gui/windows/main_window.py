@@ -84,6 +84,14 @@ class MainWindow(QMainWindow):
           "Cache Initialization Error",
           f"Failed to initialize the file information cache: {e}\n\nCache functionality will be disabled."
       )
+    
+    # Set the initialized cache on the AppState instance
+    if self.file_info_cache:
+        self.app_state.set_file_info_cache(self.file_info_cache)
+    else:
+        # If cache initialization failed, app_state.file_info_cache will remain None
+        # Widgets trying to use it should handle this gracefully (as SelectedPathsWidget does)
+        print("MainWindow: FileInfoCache was not initialized, so not setting it on AppState.")
 
 
     # --- Central widget setup with ResizeContainers ---
