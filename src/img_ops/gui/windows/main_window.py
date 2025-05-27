@@ -10,8 +10,12 @@ from ..widgets.image_viewer import ImageViewer
 from ..widgets.show_selected import ShowSelected
 from ..widgets.app_config_widget import AppConfigWidget
 from ..widgets.current_config_display import CurrentConfigDisplay
+from ..widgets.selected_paths_widget import SelectedPathsWidget # New import
 from ..state import AppState
 from ...core.app_config import AppConfiguration, get_config_manager
+from ...core.file_info_cache import FileInfoCache
+from ..dialogs.cache_status_dialog import CacheStatusDialog
+
 
 # Helper function for selectable QMessageBox
 def show_selectable_message_box(parent: QWidget, icon_type: QMessageBox.Icon, title: str, text: str, informative_text: str = "", detailed_text: str = ""):
@@ -66,6 +70,22 @@ class MainWindow(QMainWindow):
     self.config_manager = get_config_manager()
     self.app_config = self.config_manager.get_default_configuration()
 
+    # Initialize FileInfoCache
+    # In a real application, you might want to manage the lifecycle of this cache
+    # more carefully, e.g., as a singleton or passed via dependency injection.
+    # For now, we create an instance here.
+    try:
+      self.file_info_cache = FileInfoCache() # Uses default DB path
+    except Exception as e:
+      self.file_info_cache = None # Indicate cache is not available
+      show_selectable_message_box(
+          self,
+          QMessageBox.Icon.Critical,
+          "Cache Initialization Error",
+          f"Failed to initialize the file information cache: {e}\n\nCache functionality will be disabled."
+      )
+
+
     # --- Central widget setup with ResizeContainers ---
     v_splitter_main = ResizeContainer(orientation=Qt.Orientation.Vertical, parent=self)
     self.setCentralWidget(v_splitter_main)
@@ -100,10 +120,15 @@ class MainWindow(QMainWindow):
     self.image_viewer_bl.set_image_from_path(image_path)
     h_splitter_bottom.addWidget(self.image_viewer_bl)
 
-    label_br = QLabel("Bottom-Right Pane", h_splitter_bottom)
-    label_br.setAlignment(Qt.AlignmentFlag.AlignCenter)
-    label_br.setStyleSheet("background-color: #fce4ec; border: 1px solid #f8bbd0; padding: 5px;")
-    h_splitter_bottom.addWidget(label_br)
+    # Create and add the SelectedPathsWidget to the bottom-right pane
+    self.selected_paths_widget_br = SelectedPathsWidget(parent=h_splitter_bottom)
+    self.selected_paths_widget_br.set_app_state(self.app_state) # Connect to app state
+    h_splitter_bottom.addWidget(self.selected_paths_widget_br)
+    # label_br = QLabel("Bottom-Right Pane", h_splitter_bottom) # Original placeholder
+    # label_br.setAlignment(Qt.AlignmentFlag.AlignCenter)
+    # label_br.setStyleSheet("background-color: #fce4ec; border: 1px solid #f8bbd0; padding: 5px;")
+    # h_splitter_bottom.addWidget(label_br)
+
 
     h_splitter_bottom.setWidgetSizes([150, 150]) # Initial sizes for bottom horizontal panes
 
@@ -166,6 +191,20 @@ class MainWindow(QMainWindow):
     help_menu = menu_bar.addMenu("&Help")
     about_action = help_menu.addAction("&About")
     # about_action.triggered.connect(self.show_about_dialog)
+
+    # Cache menu
+    cache_menu = menu_bar.addMenu("&Cache")
+    clear_cache_action = cache_menu.addAction("&Clear Cache")
+    clear_cache_action.triggered.connect(self._clear_file_cache)
+    clean_cache_action = cache_menu.addAction("C&lean Cache")
+    clean_cache_action.triggered.connect(self._clean_file_cache)
+    cache_status_action = cache_menu.addAction("Cache &Status...")
+    cache_status_action.triggered.connect(self._show_cache_status_dialog)
+
+    # Disable cache menu items if cache is not available
+    if not self.file_info_cache:
+        cache_menu.setEnabled(False)
+
 
   def _create_status_bar(self):
     """
@@ -236,6 +275,70 @@ class MainWindow(QMainWindow):
                 "Configuration Error",
                 f"Failed to update or apply configuration: {str(e)}"
             )
+
+  def _clear_file_cache(self):
+    """
+    Handles the 'Clear Cache' menu action.
+    Confirms with the user and then clears the file info cache.
+    """
+    if not self.file_info_cache:
+      show_selectable_message_box(self, QMessageBox.Icon.Warning, "Cache Not Available", "File info cache is not initialized.")
+      return
+
+    reply = QMessageBox.question(
+        self,
+        "Confirm Clear Cache",
+        "Are you sure you want to permanently delete all entries from the phash cache?\n"
+        "This action cannot be undone.",
+        QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+        QMessageBox.StandardButton.No
+    )
+    if reply == QMessageBox.StandardButton.Yes:
+      try:
+        self.file_info_cache.clear_cache()
+        self.statusBar().showMessage("File info cache cleared.", 3000)
+        show_selectable_message_box(self, QMessageBox.Icon.Information, "Cache Cleared", "All entries have been removed from the cache.")
+      except Exception as e:
+        show_selectable_message_box(self, QMessageBox.Icon.Critical, "Error Clearing Cache", f"Could not clear the cache: {e}")
+
+  def _clean_file_cache(self):
+    """
+    Handles the 'Clean Cache' menu action.
+    Runs the clean_cache method of the FileInfoCache.
+    """
+    if not self.file_info_cache:
+      show_selectable_message_box(self, QMessageBox.Icon.Warning, "Cache Not Available", "File info cache is not initialized.")
+      return
+    try:
+      self.file_info_cache.clean_cache()
+      self.statusBar().showMessage("File info cache cleaned.", 3000)
+      show_selectable_message_box(self, QMessageBox.Icon.Information, "Cache Cleaned", "Invalid or outdated entries have been removed from the cache.")
+    except Exception as e:
+      show_selectable_message_box(self, QMessageBox.Icon.Critical, "Error Cleaning Cache", f"Could not clean the cache: {e}")
+
+  def _show_cache_status_dialog(self):
+    """
+    Handles the 'Cache Status' menu action.
+    Displays a dialog with cache statistics.
+    """
+    if not self.file_info_cache:
+      show_selectable_message_box(self, QMessageBox.Icon.Warning, "Cache Not Available", "File info cache is not initialized. Cannot show status.")
+      return
+
+    dialog = CacheStatusDialog(cache_instance=self.file_info_cache, parent=self)
+    dialog.exec()
+  
+  def closeEvent(self, event):
+    """
+    Ensure the cache connection is closed when the main window closes.
+    """
+    if self.file_info_cache:
+        try:
+            self.file_info_cache.close()
+        except Exception as e:
+            print(f"Error closing file info cache: {e}") # Log this
+    super().closeEvent(event)
+
 
 if __name__ == '__main__':
   # This part is for testing the MainWindow independently

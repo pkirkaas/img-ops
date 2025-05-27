@@ -7,7 +7,8 @@ and other file system interactions relevant to image operations.
 """
 
 import os
-from typing import List, Union
+from pathlib import Path
+from typing import List, Union, Set
 
 def extract_paths(paths: List[Union[str, os.PathLike]]) -> List[str]:
   """
@@ -200,3 +201,87 @@ def filter_imgs(file_paths: List[Union[str, os.PathLike]],
       filtered_paths.append(path_str)
   
   return filtered_paths
+
+
+def check_nested(paths: List[Union[str, Path]]) -> bool:
+  """
+  Verifies a list of file system paths to ensure they all exist and that
+  no path in the list is contained within another path in the list.
+
+  For example, if '/folderA' is in the list, then '/folderA/file.txt' or
+  '/folderA/subfolderB' cannot be in the list.
+
+  Args:
+    paths: A list of file system paths (strings or pathlib.Path objects).
+
+  Returns:
+    True if all paths exist and no path is nested within another.
+
+  Raises:
+    TypeError: If `paths` is not a list or contains non-path-like objects.
+    FileNotFoundError: If any path in the list does not exist.
+    ValueError: If any path in the list is found to be nested within another
+                path in the same list.
+
+  Example:
+    ```python
+    # Valid scenarios
+    check_nested(["/tmp/file1.txt", "/tmp/folderA"]) # Assuming they exist
+    check_nested([Path("/var/log"), Path("/etc/hosts")]) # Assuming they exist
+
+    # Invalid scenarios
+    # check_nested(["/tmp/file1.txt", "/tmp/non_existent_folder"]) # Raises FileNotFoundError
+    # check_nested(["/tmp", "/tmp/file1.txt"]) # Raises ValueError (nesting)
+    # check_nested(["/usr/local", "/usr/local/bin/my_script"]) # Raises ValueError
+    ```
+  """
+  if not isinstance(paths, list):
+    raise TypeError("Input 'paths' must be a list.")
+
+  if not paths:
+    return True # An empty list has no nesting issues and all (zero) paths exist.
+
+  # Convert all paths to absolute pathlib.Path objects and check existence
+  absolute_paths: List[Path] = []
+  for p_item in paths:
+    if not isinstance(p_item, (str, Path)):
+      raise TypeError(
+          f"All items in 'paths' must be strings or Path objects, got {type(p_item)} for '{p_item}'"
+      )
+    
+    abs_path = Path(p_item).resolve() # resolve() makes it absolute and resolves symlinks
+
+    if not abs_path.exists():
+      raise FileNotFoundError(f"Path does not exist: '{abs_path}' (original: '{p_item}')")
+    absolute_paths.append(abs_path)
+
+  # Sort paths to make parent checking easier (shorter paths, typically parents, come first)
+  # This isn't strictly necessary for correctness with Path.is_relative_to but can be intuitive.
+  # More importantly, sorting helps in identifying the *first* pair that violates the rule.
+  # We sort by string length of the path, then alphabetically for tie-breaking.
+  # This ensures that potential parents are generally processed before potential children.
+  sorted_paths = sorted(absolute_paths, key=lambda p: (len(str(p)), str(p)))
+
+  # Check for nesting
+  # Iterate through each path and compare it against all subsequent paths
+  for i in range(len(sorted_paths)):
+    p1 = sorted_paths[i]
+    for j in range(i + 1, len(sorted_paths)):
+      p2 = sorted_paths[j]
+      
+      # Check if p2 is a child of p1
+      # Path.is_relative_to() checks if p2 can be made relative to p1
+      # This means p1 is an ancestor of p2.
+      if p2.is_relative_to(p1):
+        raise ValueError(
+            f"Nesting violation: Path '{p2}' (original: '{paths[absolute_paths.index(p2)]}') "
+            f"is inside path '{p1}' (original: '{paths[absolute_paths.index(p1)]}')."
+        )
+      # We also need to check if p1 is a child of p2, which shouldn't happen if sorted by length
+      # but good for robustness if sorting logic changes or for unsorted comparison.
+      # However, given the sorting by length, p1 cannot be a child of p2 if p1 comes before p2.
+      # If we didn't sort, we'd need:
+      # if p1.is_relative_to(p2):
+      #   raise ValueError(f"Nesting violation: Path '{p1}' is inside path '{p2}'.")
+
+  return True

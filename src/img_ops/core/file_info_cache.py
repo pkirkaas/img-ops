@@ -6,7 +6,7 @@ and retrieving perceptual hashes (phashes) of images.
 import sqlite3
 import os
 from pathlib import Path
-from typing import Optional, Tuple, Any # Using Any for exc_tb in __exit__
+from typing import Optional, Tuple, Any, Union # Using Any for exc_tb in __exit__
 
 from PIL import UnidentifiedImageError
 import platformdirs
@@ -240,6 +240,36 @@ class FileInfoCache:
         # print(f"SQLite error during clean_cache deletion: {e}")
         self._conn.rollback()
         # Not re-raising here, as some cleanup might have occurred or failed partially.
+
+  def get_entry_count(self) -> int:
+    """
+    Returns the total number of entries currently in the cache.
+
+    Returns:
+      The total count of cached file entries.
+    """
+    try:
+      self._cursor.execute("SELECT COUNT(*) FROM file_cache")
+      count_result = self._cursor.fetchone()
+      return count_result[0] if count_result else 0
+    except sqlite3.Error as e:
+      # print(f"SQLite error getting entry count: {e}")
+      return 0 # Return 0 or raise an error, depending on desired strictness
+
+  def get_database_size_on_disk(self) -> Optional[int]:
+    """
+    Returns the size of the SQLite database file on disk.
+
+    Returns:
+      The size of the database file in bytes, or None if it cannot be determined
+      (e.g., file doesn't exist or os.path.getsize fails).
+    """
+    if self.db_path.exists() and self.db_path.is_file():
+      try:
+        return self.db_path.stat().st_size
+      except OSError:
+        return None
+    return None
 
   def close(self) -> None:
     """
