@@ -1,8 +1,9 @@
 from PySide6.QtWidgets import (QWidget, QVBoxLayout, QLabel, QGroupBox,
-                             QFormLayout, QLineEdit, QTextEdit)
+                               QFormLayout, QLineEdit, QTextEdit)
 from PySide6.QtCore import Qt
-from typing import Optional # Added Optional import
+from typing import Optional  # Added Optional import
 from ...core.app_config import AppConfiguration
+
 
 class CurrentConfigDisplay(QWidget):
     """
@@ -55,50 +56,58 @@ class CurrentConfigDisplay(QWidget):
         form_layout = QFormLayout(config_group)
         form_layout.setLabelAlignment(Qt.AlignmentFlag.AlignLeft)
         form_layout.setFormAlignment(Qt.AlignmentFlag.AlignLeft)
-        form_layout.setFieldGrowthPolicy(QFormLayout.FieldGrowthPolicy.AllNonFixedFieldsGrow)
+        form_layout.setFieldGrowthPolicy(
+            QFormLayout.FieldGrowthPolicy.AllNonFixedFieldsGrow)
         form_layout.setContentsMargins(10, 10, 10, 10)
         form_layout.setSpacing(8)
 
         # Configuration name
         self.name_label = QLineEdit()
         self.name_label.setReadOnly(True)
-        self.name_label.setStyleSheet("background-color: #f5f5f5; border: 1px solid #ddd; border-radius: 3px; padding: 2px;")
+        self.name_label.setStyleSheet(
+            "background-color: #f5f5f5; border: 1px solid #ddd; border-radius: 3px; padding: 2px;")
 
         # Description
         self.desc_label = QTextEdit()
         self.desc_label.setReadOnly(True)
-        self.desc_label.setStyleSheet("background-color: #f5f5f5; border: 1px solid #ddd; border-radius: 3px; padding: 2px;")
+        self.desc_label.setStyleSheet(
+            "background-color: #f5f5f5; border: 1px solid #ddd; border-radius: 3px; padding: 2px;")
         self.desc_label.setFixedHeight(60)
 
         # List of paths
         self.paths_label = QTextEdit()
         self.paths_label.setReadOnly(True)
-        self.paths_label.setStyleSheet("background-color: #f5f5f5; border: 1px solid #ddd; border-radius: 3px; padding: 2px;")
+        self.paths_label.setStyleSheet(
+            "background-color: #f5f5f5; border: 1px solid #ddd; border-radius: 3px; padding: 2px;")
         self.paths_label.setFixedHeight(80)
 
         # Similarity method
         self.method_label = QLineEdit()
         self.method_label.setReadOnly(True)
-        self.method_label.setStyleSheet("background-color: #f5f5f5; border: 1px solid #ddd; border-radius: 3px; padding: 2px;")
+        self.method_label.setStyleSheet(
+            "background-color: #f5f5f5; border: 1px solid #ddd; border-radius: 3px; padding: 2px;")
 
         # Similarity percentage
         self.percentage_label = QLineEdit()
         self.percentage_label.setReadOnly(True)
-        self.percentage_label.setStyleSheet("background-color: #f5f5f5; border: 1px solid #ddd; border-radius: 3px; padding: 2px;")
+        self.percentage_label.setStyleSheet(
+            "background-color: #f5f5f5; border: 1px solid #ddd; border-radius: 3px; padding: 2px;")
 
         # Config file path
         self.config_file_path_label = QLineEdit()
         self.config_file_path_label.setReadOnly(True)
-        self.config_file_path_label.setStyleSheet("background-color: #f5f5f5; border: 1px solid #ddd; border-radius: 3px; padding: 2px; font-size: 9px;") # Smaller font for path
- 
+        self.config_file_path_label.setStyleSheet(
+            # Smaller font for path
+            "background-color: #f5f5f5; border: 1px solid #ddd; border-radius: 3px; padding: 2px; font-size: 9px;")
+
         # Add widgets to the form layout
         form_layout.addRow(QLabel("Name:"), self.name_label)
         form_layout.addRow(QLabel("Description:"), self.desc_label)
         form_layout.addRow(QLabel("Paths:"), self.paths_label)
         form_layout.addRow(QLabel("Similarity Method:"), self.method_label)
-        form_layout.addRow(QLabel("Similarity Percentage:"), self.percentage_label)
+        form_layout.addRow(QLabel("Similarity Percentage:"),
+                           self.percentage_label)
         form_layout.addRow(QLabel("Source File:"), self.config_file_path_label)
-
 
         # Add the group box to the main layout
         layout.addWidget(config_group)
@@ -120,13 +129,16 @@ class CurrentConfigDisplay(QWidget):
         self.desc_label.setPlainText(config.description)
 
         # Format paths as a newline-separated list
-        paths_text = "\n".join(config.paths) if config.paths else "No paths configured"
+        paths_text = "\n".join(
+            config.paths) if config.paths else "No paths configured"
         self.paths_label.setPlainText(paths_text)
 
-        self.method_label.setText(config.method if config.method else "Not set")
-        self.percentage_label.setText(f"{config.percent}%" if config.percent is not None else "Not set")
-        self.config_file_path_label.setText(config_file_path if config_file_path else "N/A")
-
+        self.method_label.setText(
+            config.method if config.method else "Not set")
+        self.percentage_label.setText(
+            f"{config.percent}%" if config.percent is not None else "Not set")
+        self.config_file_path_label.setText(
+            config_file_path if config_file_path else "N/A")
 
     def _clear_display(self):
         """Clear all fields in the display."""
