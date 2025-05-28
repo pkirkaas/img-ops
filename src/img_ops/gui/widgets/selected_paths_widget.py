@@ -222,8 +222,12 @@ class SelectedPathsWidget(QWidget):
                 # Ensure the new path itself is valid (folder or image)
                 p_new = Path(selected_path)
                 if not (p_new.is_dir() or (p_new.is_file() and self._is_image_file(selected_path))):
-                    QMessageBox.warning(self, "Invalid Path Type",
-                                        f"The selected path is not a folder or a recognized image file:\n{selected_path}")
+                    msg_box = QMessageBox(self)
+                    msg_box.setIcon(QMessageBox.Icon.Warning)
+                    msg_box.setWindowTitle("Invalid Path Type")
+                    msg_box.setText(f"The selected path is not a folder or a recognized image file:\n{selected_path}")
+                    msg_box.setTextInteractionFlags(Qt.TextInteractionFlag.TextSelectableByMouse | Qt.TextInteractionFlag.TextSelectableByKeyboard)
+                    msg_box.exec()
                     return
 
                 # This will raise ValueError if nesting occurs
@@ -231,14 +235,26 @@ class SelectedPathsWidget(QWidget):
                 # This will trigger _on_global_selection_changed
                 self._app_state.add_selected_path(selected_path)
             except FileNotFoundError as e:
-                QMessageBox.warning(
-                    self, "Path Not Found", f"The selected path could not be found:\n{e}")
+                msg_box = QMessageBox(self)
+                msg_box.setIcon(QMessageBox.Icon.Warning)
+                msg_box.setWindowTitle("Path Not Found")
+                msg_box.setText(f"The selected path could not be found:\n{e}")
+                msg_box.setTextInteractionFlags(Qt.TextInteractionFlag.TextSelectableByMouse | Qt.TextInteractionFlag.TextSelectableByKeyboard)
+                msg_box.exec()
             except ValueError as e:  # Raised by check_nested for nesting violation
-                QMessageBox.warning(
-                    self, "Nesting Violation", f"Could not add path due to nesting:\n{selected_path}\n\nDetails: {e}")
+                msg_box = QMessageBox(self)
+                msg_box.setIcon(QMessageBox.Icon.Warning)
+                msg_box.setWindowTitle("Nesting Violation")
+                msg_box.setText(f"Could not add path due to nesting:\n{selected_path}\n\nDetails: {e}")
+                msg_box.setTextInteractionFlags(Qt.TextInteractionFlag.TextSelectableByMouse | Qt.TextInteractionFlag.TextSelectableByKeyboard)
+                msg_box.exec()
             except Exception as e:
-                QMessageBox.critical(
-                    self, "Error Adding Path", f"An unexpected error occurred:\n{e}")
+                msg_box = QMessageBox(self)
+                msg_box.setIcon(QMessageBox.Icon.Critical)
+                msg_box.setWindowTitle("Error Adding Path")
+                msg_box.setText(f"An unexpected error occurred:\n{e}")
+                msg_box.setTextInteractionFlags(Qt.TextInteractionFlag.TextSelectableByMouse | Qt.TextInteractionFlag.TextSelectableByKeyboard)
+                msg_box.exec()
 
     @Slot()
     def _remove_selected_paths_action(self):
@@ -299,10 +315,16 @@ class SelectedPathsWidget(QWidget):
         """Removes all paths from the selection."""
         if self._app_state:
             # Ask for confirmation
-            reply = QMessageBox.question(self, "Confirm Clear",
-                                         "Are you sure you want to remove all paths?",
-                                         QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
-                                         QMessageBox.StandardButton.No)
+            msg_box = QMessageBox(self)
+            msg_box.setIcon(QMessageBox.Icon.Question)
+            msg_box.setWindowTitle("Confirm Clear")
+            msg_box.setText("Are you sure you want to remove all paths?")
+            msg_box.setStandardButtons(QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No)
+            msg_box.setDefaultButton(QMessageBox.StandardButton.No)
+            # For question dialogs, making the main text selectable is good.
+            msg_box.setTextInteractionFlags(Qt.TextInteractionFlag.TextSelectableByMouse | Qt.TextInteractionFlag.TextSelectableByKeyboard)
+            reply = msg_box.exec()
+
             if reply == QMessageBox.StandardButton.Yes:
                 self._app_state.clear_selected_paths()
 
@@ -312,8 +334,12 @@ class SelectedPathsWidget(QWidget):
     def _validate_paths_action(self):
         """Validates current paths for nesting and image types."""
         if not self._app_state or not self._app_state.selected_paths:
-            QMessageBox.information(
-                self, "Validate Paths", "No paths selected to validate.")
+            msg_box = QMessageBox(self)
+            msg_box.setIcon(QMessageBox.Icon.Information)
+            msg_box.setWindowTitle("Validate Paths")
+            msg_box.setText("No paths selected to validate.")
+            msg_box.setTextInteractionFlags(Qt.TextInteractionFlag.TextSelectableByMouse | Qt.TextInteractionFlag.TextSelectableByKeyboard)
+            msg_box.exec()
             return
 
         paths_to_check = list(self._app_state.selected_paths)
@@ -331,18 +357,30 @@ class SelectedPathsWidget(QWidget):
                 errors.append(f"Path does not exist: {path_str}")
 
         if errors:
-            QMessageBox.warning(self, "Validation Failed",
-                                "Found issues:\n\n" + "\n".join(errors))
+            msg_box = QMessageBox(self)
+            msg_box.setIcon(QMessageBox.Icon.Warning)
+            msg_box.setWindowTitle("Validation Failed")
+            msg_box.setText("Found issues:\n\n" + "\n".join(errors))
+            msg_box.setTextInteractionFlags(Qt.TextInteractionFlag.TextSelectableByMouse | Qt.TextInteractionFlag.TextSelectableByKeyboard)
+            msg_box.exec()
         else:
-            QMessageBox.information(
-                self, "Validation Successful", "All selected paths are valid and not nested.")
+            msg_box = QMessageBox(self)
+            msg_box.setIcon(QMessageBox.Icon.Information)
+            msg_box.setWindowTitle("Validation Successful")
+            msg_box.setText("All selected paths are valid and not nested.")
+            msg_box.setTextInteractionFlags(Qt.TextInteractionFlag.TextSelectableByMouse | Qt.TextInteractionFlag.TextSelectableByKeyboard)
+            msg_box.exec()
 
     @Slot()
     def _list_files_action(self):
         """Lists all image files from the selected paths in a dialog."""
         if not self._app_state or not self._app_state.selected_paths:
-            QMessageBox.information(
-                self, "List Files", "No paths selected to list files from.")
+            msg_box = QMessageBox(self)
+            msg_box.setIcon(QMessageBox.Icon.Information)
+            msg_box.setWindowTitle("List Files")
+            msg_box.setText("No paths selected to list files from.")
+            msg_box.setTextInteractionFlags(Qt.TextInteractionFlag.TextSelectableByMouse | Qt.TextInteractionFlag.TextSelectableByKeyboard)
+            msg_box.exec()
             return
 
         current_paths = list(self._app_state.selected_paths)
@@ -355,12 +393,15 @@ class SelectedPathsWidget(QWidget):
         QApplication.processEvents()  # Allow progress dialog to show
 
         try:
-            all_image_files = get_all_image_files_in_paths(
-                current_paths, DEFAULT_IMAGE_EXTENSIONS_PATTERNS)
+            all_image_files = get_all_image_files_in_paths(current_paths) # Removed second argument
         except Exception as e:
             progress.close()
-            QMessageBox.critical(self, "Error Listing Files",
-                                 f"An error occurred while gathering files:\n{e}")
+            msg_box = QMessageBox(self)
+            msg_box.setIcon(QMessageBox.Icon.Critical)
+            msg_box.setWindowTitle("Error Listing Files")
+            msg_box.setText(f"An error occurred while gathering files:\n{e}")
+            msg_box.setTextInteractionFlags(Qt.TextInteractionFlag.TextSelectableByMouse | Qt.TextInteractionFlag.TextSelectableByKeyboard)
+            msg_box.exec()
             return
         finally:
             progress.close()
@@ -389,13 +430,21 @@ class SelectedPathsWidget(QWidget):
     def _phash_files_action(self):
         """Computes and caches PHashes for all image files from selected paths."""
         if not self._app_state or not self._app_state.selected_paths:
-            QMessageBox.information(
-                self, "PHash Files", "No paths selected to PHash.")
+            msg_box = QMessageBox(self)
+            msg_box.setIcon(QMessageBox.Icon.Information)
+            msg_box.setWindowTitle("PHash Files")
+            msg_box.setText("No paths selected to PHash.")
+            msg_box.setTextInteractionFlags(Qt.TextInteractionFlag.TextSelectableByMouse | Qt.TextInteractionFlag.TextSelectableByKeyboard)
+            msg_box.exec()
             return
 
         if not self._app_state.file_info_cache:  # Assuming cache is in app_state
-            QMessageBox.critical(self, "PHash Error",
-                                 "File info cache is not available.")
+            msg_box = QMessageBox(self)
+            msg_box.setIcon(QMessageBox.Icon.Critical)
+            msg_box.setWindowTitle("PHash Error")
+            msg_box.setText("File info cache is not available.")
+            msg_box.setTextInteractionFlags(Qt.TextInteractionFlag.TextSelectableByMouse | Qt.TextInteractionFlag.TextSelectableByKeyboard)
+            msg_box.exec()
             return
 
         current_paths = list(self._app_state.selected_paths)
@@ -408,19 +457,26 @@ class SelectedPathsWidget(QWidget):
         QApplication.processEvents()
 
         try:
-            all_image_files = get_all_image_files_in_paths(
-                current_paths, DEFAULT_IMAGE_EXTENSIONS_PATTERNS)
+            all_image_files = get_all_image_files_in_paths(current_paths) # Removed second argument
         except Exception as e:
             gather_progress.close()
-            QMessageBox.critical(self, "Error PHashing",
-                                 f"Error gathering files for PHashing:\n{e}")
+            msg_box = QMessageBox(self)
+            msg_box.setIcon(QMessageBox.Icon.Critical)
+            msg_box.setWindowTitle("Error PHashing")
+            msg_box.setText(f"Error gathering files for PHashing:\n{e}")
+            msg_box.setTextInteractionFlags(Qt.TextInteractionFlag.TextSelectableByMouse | Qt.TextInteractionFlag.TextSelectableByKeyboard)
+            msg_box.exec()
             return
         finally:
             gather_progress.close()
 
         if not all_image_files:
-            QMessageBox.information(
-                self, "PHash Files", "No image files found to PHash.")
+            msg_box = QMessageBox(self)
+            msg_box.setIcon(QMessageBox.Icon.Information)
+            msg_box.setWindowTitle("PHash Files")
+            msg_box.setText("No image files found to PHash.")
+            msg_box.setTextInteractionFlags(Qt.TextInteractionFlag.TextSelectableByMouse | Qt.TextInteractionFlag.TextSelectableByKeyboard)
+            msg_box.exec()
             return
 
         cache: FileInfoCache = self._app_state.file_info_cache
@@ -457,7 +513,12 @@ class SelectedPathsWidget(QWidget):
         if error_count > 0:
             summary_message += f"\nErrors encountered: {error_count} files (see console for details)."
 
-        QMessageBox.information(self, "PHash Complete", summary_message)
+        msg_box = QMessageBox(self)
+        msg_box.setIcon(QMessageBox.Icon.Information)
+        msg_box.setWindowTitle("PHash Complete")
+        msg_box.setText(summary_message)
+        msg_box.setTextInteractionFlags(Qt.TextInteractionFlag.TextSelectableByMouse | Qt.TextInteractionFlag.TextSelectableByKeyboard)
+        msg_box.exec()
 
 
 if __name__ == '__main__':

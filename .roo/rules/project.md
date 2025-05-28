@@ -11,3 +11,4 @@
 - Project features/functionality will be built incrementally, one step at a time.
 - Prefer pip packages to implement functionality rather than re-inventing the wheel
 - Suggest useful pip packages if not already installed
+- When changing a function name, signature, or behavior - find all usages of the function in all the source code and update all references appropriately with new name/arguments.

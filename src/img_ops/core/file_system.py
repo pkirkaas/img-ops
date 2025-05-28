@@ -9,6 +9,53 @@ and other file system interactions relevant to image operations.
 import os
 from pathlib import Path
 from typing import List, Union, Set
+import warnings
+
+try:
+    from PIL import Image
+    PIL_AVAILABLE = True
+except ImportError:
+    PIL_AVAILABLE = False
+    # Pillow is optional for level 2 validation.
+    # A warning will be issued if level 2 is attempted without Pillow.
+
+# Define comprehensive list of common image file extensions at the module level
+# Includes both lowercase and uppercase variants for case-insensitive matching by design
+# but will be converted to lowercase for consistent comparison.
+DEFAULT_IMAGE_EXTENSIONS: Set[str] = {
+    # JPEG formats
+    '.jpg', '.jpeg', '.jpe', '.jif', '.jfif', '.jfi',
+    # PNG format
+    '.png',
+    # GIF format
+    '.gif',
+    # BMP formats
+    '.bmp', '.dib',
+    # TIFF formats
+    '.tiff', '.tif',
+    # WebP format
+    '.webp',
+    # SVG format
+    '.svg', '.svgz',
+    # ICO format
+    '.ico',
+    # Raw camera formats
+    '.raw', '.arw', '.cr2', '.cr3', '.crw', '.dng', '.nef', '.nrw', '.orf', '.pef', '.raf', '.rw2', '.srw',
+    # Adobe formats
+    '.psd', '.psb',
+    # HEIF/HEIC formats (modern Apple formats)
+    '.heif', '.heic', '.heics', '.avif',
+    # Other formats
+    '.pcx', '.tga', '.exr', '.hdr', '.pic', '.pnm', '.pbm', '.pgm', '.ppm',
+    # Windows formats
+    '.wmf', '.emf',
+    # JPEG 2000
+    '.jp2', '.j2k', '.jpf', '.jpx', '.jpm', '.mj2',
+    # JPEG XL
+    '.jxl'
+}
+# Ensure all default extensions are lowercase for consistent comparison
+_LOWERCASE_DEFAULT_IMAGE_EXTENSIONS: Set[str] = {ext.lower() for ext in DEFAULT_IMAGE_EXTENSIONS}
 
 
 def extract_paths(paths: List[Union[str, os.PathLike]]) -> List[str]:
@@ -70,140 +117,124 @@ def extract_paths(paths: List[Union[str, os.PathLike]]) -> List[str]:
     return sorted(list(set(all_file_paths)))
 
 
-def filter_imgs(file_paths: List[Union[str, os.PathLike]],
-                case_sensitive: bool = False,
-                custom_extensions: List[str] = None) -> List[str]:
+def valid_img_path(file_path: Union[str, os.PathLike], validation_level: int = 0) -> bool:
     """
-    Filters a list of file paths to return only those that represent image files.
+    Checks if a given path is a valid image file based on the specified validation level.
 
-    Determines if a file is an image based on its file extension. Supports all
-    common image formats including JPEG, PNG, GIF, BMP, TIFF, WebP, and many others.
-    The function is case-insensitive by default but can be configured to be case-sensitive.
+    Validation Levels:
+      - 0: Checks only if the file extension is a known image type (case-insensitive).
+           Does not check for file existence.
+      - 1: Performs level 0 check AND verifies that the path exists and is a file.
+      - 2: Performs level 1 check AND attempts to open and verify the file as an image
+           using Pillow (if available). If Pillow is not installed, or if the file
+           cannot be verified as an image, this check will fail (returns False).
+
+    Args:
+      file_path: The file path (string or PathLike object) to validate.
+      validation_level: An integer (0, 1, or 2) specifying the depth of validation.
+                        Defaults to 0.
+
+    Returns:
+      True if the path meets the validation criteria for the given level, False otherwise.
+
+    Raises:
+      TypeError: If file_path is not a string or PathLike object.
+      ValueError: If validation_level is not 0, 1, or 2.
+
+    Example:
+      >>> # Level 0: Only checks extension
+      >>> valid_img_path('photo.jpg', 0)
+      True
+      >>> valid_img_path('non_existent.png', 0)
+      True
+      >>> # Level 1: Checks extension and existence (assuming 'photo.jpg' exists)
+      >>> valid_img_path('photo.jpg', 1)
+      True
+      >>> valid_img_path('non_existent.png', 1)
+      False
+      >>> # Level 2: Checks extension, existence, and image content (assuming 'photo.jpg' is valid)
+      >>> # valid_img_path('photo.jpg', 2) # Might be True if Pillow can open it
+      >>> # valid_img_path('corrupt.jpg', 2) # Might be False
+    """
+    if not isinstance(file_path, (str, os.PathLike)):
+        raise TypeError(
+            f"Input 'file_path' must be a string or PathLike object, got {type(file_path)}")
+    if validation_level not in [0, 1, 2]:
+        raise ValueError(
+            f"validation_level must be 0, 1, or 2, got {validation_level}")
+
+    p = Path(file_path)
+    extension = p.suffix.lower()
+
+    # Level 0: Check extension only
+    is_valid_extension = extension in _LOWERCASE_DEFAULT_IMAGE_EXTENSIONS
+    if not is_valid_extension:
+        return False
+    if validation_level == 0:
+        return True
+
+    # Level 1: Check existence and if it's a file
+    if not p.is_file():
+        return False
+    if validation_level == 1:
+        return True
+
+    # Level 2: Verify image content using Pillow
+    if validation_level == 2:
+        if not PIL_AVAILABLE:
+            warnings.warn(
+                f"Pillow (PIL) is not installed. Cannot perform level 2 image content validation for '{p}'. "
+                "Falling back to level 1 (file existence check).", UserWarning
+            )
+            return True # Already passed level 1
+
+        try:
+            with Image.open(p) as img:
+                img.verify()  # Verifies image integrity
+            return True
+        except Exception:  # Catches PIL specific errors and others like FileNotFoundError if somehow missed
+            return False
+
+    return False # Should not be reached if validation_level is 0, 1, or 2
+
+
+def filter_imgs(file_paths: List[Union[str, os.PathLike]], validation_level: int = 0) -> List[str]:
+    """
+    Filters a list of file paths to return only those that represent valid image files,
+    based on the specified validation level.
+
+    Uses `valid_img_path` internally for each file.
 
     Args:
       file_paths: A list of file paths (strings or PathLike objects) to filter.
-                  Can include both absolute and relative paths.
-      case_sensitive: If True, extension matching will be case-sensitive.
-                     If False (default), extensions will be matched case-insensitively.
-                     For example, both '.JPG' and '.jpg' will be considered image files.
-      custom_extensions: Optional list of additional file extensions to consider as images.
-                        Should include the dot (e.g., ['.xyz', '.custom']).
-                        These will be added to the default list of image extensions.
+      validation_level: An integer (0, 1, or 2) specifying the depth of validation
+                        for each file. Defaults to 0.
+                        See `valid_img_path` for details on validation levels.
 
     Returns:
-      A list of file paths that have image file extensions, preserving the original
-      path format (absolute/relative) and order from the input list.
+      A list of file paths that are considered valid images according to the
+      specified validation level. Preserves original path format and order.
 
     Raises:
-      TypeError: If file_paths is not a list.
-      TypeError: If any element in file_paths is not a string or PathLike object.
-      TypeError: If case_sensitive is not a boolean.
-      TypeError: If custom_extensions is provided but is not a list.
-      ValueError: If any custom extension doesn't start with a dot.
+      TypeError: If file_paths is not a list or if any element is not a string/PathLike.
+      ValueError: If validation_level is not 0, 1, or 2 (raised by `valid_img_path`).
 
     Example:
-      >>> # Basic usage with mixed file types
-      >>> paths = ['/home/user/photo.jpg', '/home/user/document.txt', '/home/user/image.PNG']
-      >>> filter_imgs(paths)
-      ['/home/user/photo.jpg', '/home/user/image.PNG']
-
-      >>> # Case-sensitive filtering
-      >>> paths = ['/home/user/photo.JPG', '/home/user/image.jpg']
-      >>> filter_imgs(paths, case_sensitive=True)
-      ['/home/user/image.jpg']  # Only lowercase .jpg matches
-
-      >>> # With custom extensions
-      >>> paths = ['/home/user/photo.jpg', '/home/user/custom.xyz']
-      >>> filter_imgs(paths, custom_extensions=['.xyz'])
-      ['/home/user/photo.jpg', '/home/user/custom.xyz']
+      >>> paths = ['img.jpg', 'doc.txt', 'non_existent.png']
+      >>> # filter_imgs(paths, 0) would include 'img.jpg', 'non_existent.png'
+      >>> # filter_imgs(paths, 1) (assuming 'img.jpg' exists) would include 'img.jpg'
     """
-    # Input validation
     if not isinstance(file_paths, list):
         raise TypeError("Input 'file_paths' must be a list.")
 
-    if not isinstance(case_sensitive, bool):
-        raise TypeError("Parameter 'case_sensitive' must be a boolean.")
-
-    if custom_extensions is not None:
-        if not isinstance(custom_extensions, list):
-            raise TypeError(
-                "Parameter 'custom_extensions' must be a list or None.")
-        for ext in custom_extensions:
-            if not isinstance(ext, str) or not ext.startswith('.'):
-                raise ValueError(
-                    f"Custom extension '{ext}' must be a string starting with a dot.")
-
-    # Define comprehensive list of common image file extensions
-    # Includes both lowercase and uppercase variants for case-insensitive matching
-    default_image_extensions = {
-        # JPEG formats
-        '.jpg', '.jpeg', '.jpe', '.jif', '.jfif', '.jfi',
-        # PNG format
-        '.png',
-        # GIF format
-        '.gif',
-        # BMP formats
-        '.bmp', '.dib',
-        # TIFF formats
-        '.tiff', '.tif',
-        # WebP format
-        '.webp',
-        # SVG format
-        '.svg', '.svgz',
-        # ICO format
-        '.ico',
-        # Raw camera formats
-        '.raw', '.arw', '.cr2', '.cr3', '.crw', '.dng', '.nef', '.nrw', '.orf', '.pef', '.raf', '.rw2', '.srw',
-        # Adobe formats
-        '.psd', '.psb',
-        # HEIF/HEIC formats (modern Apple formats)
-        '.heif', '.heic', '.heics', '.avif',
-        # Other formats
-        '.pcx', '.tga', '.exr', '.hdr', '.pic', '.pnm', '.pbm', '.pgm', '.ppm',
-        # Windows formats
-        '.wmf', '.emf',
-        # JPEG 2000
-        '.jp2', '.j2k', '.jpf', '.jpx', '.jpm', '.mj2',
-        # JPEG XL
-        '.jxl'
-    }
-
-    # Add custom extensions if provided
-    image_extensions = default_image_extensions.copy()
-    if custom_extensions:
-        # Convert custom extensions to lowercase for consistent comparison
-        if case_sensitive:
-            image_extensions.update(custom_extensions)
-        else:
-            image_extensions.update(ext.lower() for ext in custom_extensions)
-
-    # If case-insensitive, ensure all extensions are lowercase
-    if not case_sensitive:
-        image_extensions = {ext.lower() for ext in image_extensions}
-
-    # Filter the file paths
     filtered_paths: List[str] = []
-
-    for file_path in file_paths:
-        # Validate each path item
-        if not isinstance(file_path, (str, os.PathLike)):
+    for path_item in file_paths:
+        if not isinstance(path_item, (str, os.PathLike)):
             raise TypeError(
-                f"All items in 'file_paths' must be strings or PathLike objects, got {type(file_path)} for '{file_path}'")
+                f"All items in 'file_paths' must be strings or PathLike objects, got {type(path_item)} for '{path_item}'")
 
-        # Convert PathLike to string
-        path_str = str(file_path)
-
-        # Extract file extension
-        _, extension = os.path.splitext(path_str)
-
-        # Compare extension based on case sensitivity setting
-        if case_sensitive:
-            is_image = extension in image_extensions
-        else:
-            is_image = extension.lower() in image_extensions
-
-        # Add to filtered list if it's an image
-        if is_image:
+        path_str = str(path_item)
+        if valid_img_path(path_str, validation_level=validation_level):
             filtered_paths.append(path_str)
 
     return filtered_paths
@@ -297,56 +328,47 @@ def check_nested(paths: List[Union[str, Path]]) -> bool:
 
 
 def get_all_image_files_in_paths(
-    paths_to_scan: List[Union[str, Path]],
-    image_extensions_patterns: List[str]
+    paths_to_scan: List[Union[str, Path]]
 ) -> List[Path]:
     """
     Scans a list of input paths (which can be files or directories) and returns
     a list of all unique image files found.
 
     For directories, it recursively searches for image files.
-    Image files are identified by the provided extension patterns.
+    Image files are identified by the predefined list of common image extensions
+    (see DEFAULT_IMAGE_EXTENSIONS).
 
     Args:
       paths_to_scan: A list of file system paths (strings or pathlib.Path objects)
                      to scan.
-      image_extensions_patterns: A list of image file extension patterns (e.g., "*.jpg", "*.png").
 
     Returns:
       A list of pathlib.Path objects, each pointing to a unique image file found.
       Returns an empty list if no image files are found or if inputs are empty.
 
     Raises:
-      TypeError: If inputs are not of the expected types.
-      ValueError: If image_extensions_patterns contains invalid patterns.
+      TypeError: If paths_to_scan is not of the expected type.
     """
     if not isinstance(paths_to_scan, list):
         raise TypeError("Input 'paths_to_scan' must be a list.")
-    if not isinstance(image_extensions_patterns, list):
-        raise TypeError("Input 'image_extensions_patterns' must be a list.")
 
     if not paths_to_scan:
         return []
 
-    # Convert patterns like "*.jpg" to ".jpg" for filter_imgs
-    custom_extensions_for_filter = []
-    for pattern in image_extensions_patterns:
-        if not isinstance(pattern, str) or not pattern.startswith("*.") or len(pattern) <= 2:
-            raise ValueError(
-                f"Invalid image extension pattern: '{pattern}'. Must be like '*.ext'.")
-        custom_extensions_for_filter.append(pattern[1:])  # Get ".ext"
-
     try:
         # 1. Extract all file paths from the input list (handles directories recursively)
+        #    This step ensures that paths exist and are files before filtering.
         all_files_str = extract_paths(paths_to_scan)
 
-        # 2. Filter these files to get only images based on the provided extensions
-        #    filter_imgs expects extensions like ['.jpg'], not ['jpg'] or ['*.jpg']
-        #    It's case-insensitive by default.
+        # 2. Filter these files to get only images based on the default extensions.
+        #    validation_level=0 is used because extract_paths already confirms existence.
+        #    We only need to check the extension here.
         image_files_str = filter_imgs(
-            all_files_str, custom_extensions=custom_extensions_for_filter)
+            all_files_str, validation_level=0
+        )
 
-        # Convert to Path objects and ensure uniqueness (though extract_paths already does some sorting/uniquing)
+        # Convert to Path objects and ensure uniqueness
+        # (though extract_paths already does some sorting/uniquing of its output)
         unique_image_paths = sorted(
             list(set(Path(p) for p in image_files_str)))
         return unique_image_paths
