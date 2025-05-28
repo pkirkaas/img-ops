@@ -14,7 +14,8 @@ import platformdirs
 # Assuming img_similarity.py is in the same package (src.img_ops.core)
 from .img_similarity import img_phash
 
-
+# Default db path: "C:/Users/pkirk/AppData/Local/pkirkaas/img-ops/file_info_cache.db"
+# Default yaml app settings: "C:/Users/pkirk/AppData/Local/img-ops/img-ops/app_config.yaml"
 class FileInfoCache:
     """
     Manages a cache of file information, including file size, modification time,

@@ -15,6 +15,8 @@ from platformdirs import user_config_dir
 
 from .exceptions import ConfigError
 
+# Default db path: "C:/Users/pkirk/AppData/Local/pkirkaas/img-ops/file_info_cache.db"
+# Default yaml app settings: "C:/Users/pkirk/AppData/Local/img-ops/img-ops/app_config.yaml"
 
 class AppConfiguration(BaseModel):
     """
