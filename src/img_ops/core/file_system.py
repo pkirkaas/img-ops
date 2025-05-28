@@ -11,6 +11,8 @@ from pathlib import Path
 from typing import List, Union, Set
 import warnings
 
+from img_ops.core.logging import get_logger # Added for logging demo
+
 try:
     from PIL import Image
     PIL_AVAILABLE = True
@@ -199,6 +201,14 @@ def valid_img_path(file_path: Union[str, os.PathLike], validation_level: int = 0
 
 
 def filter_imgs(file_paths: List[Union[str, os.PathLike]], validation_level: int = 0) -> List[str]:
+    logger = get_logger(__name__) # Get logger for the current module
+    logger.info(
+        f"Entering filter_imgs function. "
+        f"Parameters: file_paths_count={len(file_paths) if file_paths else 0}, validation_level={validation_level}"
+    )
+    # To log all paths, which could be very long:
+    # logger.debug(f"file_paths: {file_paths}") # Use debug for potentially verbose output
+
     """
     Filters a list of file paths to return only those that represent valid image files,
     based on the specified validation level.

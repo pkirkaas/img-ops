@@ -2,6 +2,7 @@
 Logging Mixin for easy logger access in classes.
 """
 import logging
+from typing import Optional # Added import for Optional
 from .manager import get_logger as get_managed_logger # Renamed to avoid conflict
 
 class LoggerMixin:
