@@ -72,7 +72,7 @@ class FileInfoCache:
             file_path TEXT PRIMARY KEY,
             size INTEGER NOT NULL,
             mod_time REAL NOT NULL,
-            phash TEXT
+            phash INTEGER  -- Changed from TEXT to INTEGER
         );
       """)
             self._conn.commit()
@@ -103,20 +103,20 @@ class FileInfoCache:
             # print(f"Warning: Could not get stats for {file_path}: {e}")
             return None
 
-    def get_phash(self, file_path: Union[str, Path]) -> Optional[str]:
+    def get_phash(self, file_path: Union[str, Path]) -> Optional[int]:
         """
-        Retrieves the perceptual hash (phash) for a given file.
+        Retrieves the perceptual hash (phash) for a given file as an integer.
 
         If the file is already in the cache and has not been modified, the cached
-        phash is returned. Otherwise, a new phash is generated, stored in the
-        cache, and then returned. If phash generation fails (e.g., not an image),
-        None is stored and returned.
+        integer phash is returned. Otherwise, a new phash is generated (as an integer),
+        stored in the cache, and then returned. If phash generation fails
+        (e.g., not an image), None is stored and returned.
 
         Args:
           file_path: The path to the image file (can be relative or absolute).
 
         Returns:
-          The hexadecimal string representation of the phash if successful,
+          The integer representation of the phash if successful,
           or None if the file doesn't exist, is not a valid image, or an error occurs.
         """
         abs_file_path = str(Path(file_path).resolve())
@@ -127,55 +127,51 @@ class FileInfoCache:
             return None
         current_size, current_mod_time = current_stats
 
-        cached_phash_value: Optional[str] = None
+        cached_phash_value: Optional[int] = None # Changed type to Optional[int]
         update_cache = True  # Assume we need to update/insert unless proven otherwise
+        cached_entry_exists = False
 
         try:
             self._cursor.execute(
                 "SELECT size, mod_time, phash FROM file_cache WHERE file_path = ?",
                 (abs_file_path,)
             )
-            cached_entry = self._cursor.fetchone()
+            cached_row = self._cursor.fetchone()
 
-            if cached_entry:
-                cached_size, cached_mod_time, db_phash_val = cached_entry
+            if cached_row:
+                cached_entry_exists = True
+                cached_size, cached_mod_time, db_phash_val = cached_row # db_phash_val is now int or None
                 # Ensure floating point comparison is safe for mod_time
-                # SQLite REAL can store floats precisely, os.stat().st_mtime is float
-                # Check for near equality for floats
                 if cached_size == current_size and abs(cached_mod_time - current_mod_time) < 1e-6:
-                    if db_phash_val is not None:  # We have a valid, non-NULL phash
-                        cached_phash_value = db_phash_val
-                        update_cache = False  # Cache is valid and phash exists
-                    # If db_phash_val is NULL, it means we tried before and failed,
-                    # but file hasn't changed, so don't try again unless forced.
-                    # However, the spec implies re-generating if phash is NULL.
-                    # Let's stick to: if file unchanged and phash is NULL, it means it's not an image
-                    # or failed previously. We should only re-calculate if file changed OR phash is NULL.
-                    # The current logic will proceed to "Cache miss or invalidation" if db_phash_val is NULL.
-                    # This is correct as per "or if there is no phash value" in the spec.
+                    # File is unchanged.
+                    # If db_phash_val is not None, it's our cached integer phash.
+                    # If db_phash_val is None, it means we tried before and it failed (e.g. not an image),
+                    # and since the file hasn't changed, we don't need to try again.
+                    cached_phash_value = db_phash_val # This can be int or None
+                    update_cache = False # Cache is valid, whether phash is known or known to be None
 
         except sqlite3.Error as e:
             # Log this error, but proceed as if cache miss
             # print(f"SQLite error during phash retrieval for {abs_file_path}: {e}")
-            cached_entry = None  # Ensure we treat it as a cache miss
+            # Ensure we treat it as a cache miss by not setting update_cache = False
+            pass
 
         if update_cache:
-            new_phash_val: Optional[str] = None
+            new_phash_val: Optional[int] = None # Changed type to Optional[int]
             try:
-                # img_phash from .img_similarity is expected to return str or raise error
-                new_phash_val = img_phash(abs_file_path, return_format='hex')
-            except FileNotFoundError:  # Should be caught by _get_file_stats, but defensive
+                # img_phash from .img_similarity now defaults to return_format='int'
+                new_phash_val = img_phash(abs_file_path)
+            except FileNotFoundError:
                 return None  # File disappeared
-            except UnidentifiedImageError:  # PIL specific error for non-images
+            except UnidentifiedImageError:
                 new_phash_val = None  # Store None to indicate it's not a processable image
-            except Exception:
-                # Catch any other error from img_phash (e.g., internal library issues)
+            except Exception: # Catch any other error from img_phash
                 # Consider logging the specific exception e
                 # print(f"Error generating phash for {abs_file_path}: {e_phash}")
                 new_phash_val = None  # Store None for other errors
 
             try:
-                if cached_entry:  # Entry exists, so update it
+                if cached_entry_exists: # Entry exists, so update it
                     self._cursor.execute(
                         "UPDATE file_cache SET size = ?, mod_time = ?, phash = ? WHERE file_path = ?",
                         (current_size, current_mod_time,
