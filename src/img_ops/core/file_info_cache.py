@@ -37,6 +37,17 @@ class FileInfoCache:
         Raises:
           sqlite3.Error: If there's an issue connecting to or setting up the database.
         """
+        # Adapter: Convert uint64 to string for storage
+        def adapt_uint64_text(value):
+            return str(value).encode('utf-8')
+
+# Converter: Convert string back to int
+        def convert_uint64_text(value):
+            return int(value.decode('utf-8'))
+
+        # Register the adapter and converter
+        sqlite3.register_adapter(int, adapt_uint64_text)
+        sqlite3.register_converter("UINT64", convert_uint64_text)
         if db_path:
             self.db_path: Path = Path(db_path).resolve()
         else:
@@ -54,7 +65,8 @@ class FileInfoCache:
                 f"Failed to create database directory {self.db_path.parent}: {e}") from e
 
         try:
-            self._conn: sqlite3.Connection = sqlite3.connect(self.db_path)
+            self._conn: sqlite3.Connection = sqlite3.connect(self.db_path, detect_types=sqlite3.PARSE_DECLTYPES)
+
             self._cursor: sqlite3.Cursor = self._conn.cursor()
             self._ensure_db_table()
         except sqlite3.Error as e:
@@ -72,7 +84,7 @@ class FileInfoCache:
             file_path TEXT PRIMARY KEY,
             size INTEGER NOT NULL,
             mod_time REAL NOT NULL,
-            phash INTEGER  -- Changed from TEXT to INTEGER
+            phash UINT64
         );
       """)
             self._conn.commit()
